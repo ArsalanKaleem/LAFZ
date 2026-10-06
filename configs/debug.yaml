@@ -1,0 +1,8 @@
+# Tiny settings to debug the pipeline end-to-end in minutes (Days 1-6).
+extends: qwen2.5-1.5b.yaml
+tokenizer: { max_budget: 2000, min_pair_freq: 2, min_word_freq: 1 }
+projection: { max_pairs: 20000 }
+lora: { steps: 30, batch_size: 2, grad_accum: 1, seq_len: 256, log_every: 5 }
+data: { max_eval_sentences: 200 }
+flores: { max_sentences: 50, n_shots: 1 }
+latency: { n_sentences: 20, repeats: 2, warmup: 2 }

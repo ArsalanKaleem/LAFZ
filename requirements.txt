@@ -1,0 +1,15 @@
+# Pin exact versions after Day 1 with: pip freeze > requirements.lock.txt
+torch>=2.2
+transformers>=4.45
+tokenizers>=0.19
+peft>=0.11
+accelerate>=0.30
+datasets>=2.19
+safetensors
+numpy
+pandas
+scipy
+pyyaml
+sacrebleu>=2.3
+matplotlib
+pytest

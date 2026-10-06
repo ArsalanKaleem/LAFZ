@@ -1,0 +1,105 @@
+# HARF main config. Every run copies the fully-resolved config into its run dir.
+# Override anything from the CLI:  harf run --config configs/qwen2.5-1.5b.yaml --lang ur --condition D --set lora.steps=200
+
+seed: 13
+lang: ur                     # ur | sd | ur+sd   (one language at a time first)
+
+model:
+  name: Qwen/Qwen2.5-1.5B    # base LM for compression / perplexity / LoRA
+  revision: main             # PIN THIS to a commit hash on Day 1 (huggingface.co/<model>/commits/main)
+  instruct_name: Qwen/Qwen2.5-1.5B-Instruct   # optional, used for FLORES if flores.use_instruct=true
+  dtype: bfloat16            # inference dtype
+  attn_implementation: sdpa
+
+paths:
+  raw:                       # glob patterns; .txt, .txt.gz, .jsonl, .jsonl.gz supported
+    ur: ["data/raw/ur/**/*"]
+    sd: ["data/raw/sd/**/*"]
+  processed: data/processed
+  runs: runs
+  flores_dir: data/flores200_dataset   # contains dev/ and devtest/ (FLORES-200 tarball layout)
+
+data:
+  doc_mode: paragraph        # for .txt: "line" = one doc per line, "paragraph" = blank-line separated
+  text_field: text           # for .jsonl
+  min_doc_chars: 20
+  min_arabic_ratio: 0.6      # share of letters that are Arabic-script
+  strip_urls: true
+  strip_html: true
+  # Orthographic canonicalisation is LANGUAGE-SPECIFIC and OFF by default.
+  # Never apply Urdu rules to Sindhi: in Sindhi, ک (U+06A9) is a different letter (kheh) from ڪ (U+06AA, kaf).
+  canonicalize_letters: false
+  canonicalize_heh: false    # Urdu only: ه -> ہ (risky; inspect before enabling)
+  purity_filter: true        # drop docs that look like the *other* language (Sindhi/Urdu marker letters)
+  valid_frac: 0.02
+  test_frac: 0.02
+  max_eval_sentences: 2000
+  min_sentence_chars: 10
+
+tokenizer:
+  strategy: continued        # continued (BPE continued over base segmentation; exact budget) | target_bpe (guide Day 4 style)
+  max_budget: 8000           # learned once; 2k/4k are exact prefixes of the 8k merge list
+  min_pair_freq: 5
+  min_word_freq: 2
+  max_unique_words: 2000000
+  target_bpe_vocab: 16000    # only for train-bpe / target_bpe strategy
+
+projection:
+  pairs: arabic              # which base merges to learn W from: all | arabic
+  max_pairs: 120000
+  val_frac: 0.1
+  lambdas: [0.01, 0.1, 1.0, 10.0, 100.0]   # relative ridge strengths (scaled by mean eigenvalue)
+  rescale_norm: true
+  lexicon: null              # optional TSV: <target_word>\t<english_word>  (parallel anchor)
+  anchor_alpha: 0.3
+
+lora:
+  steps: 1500
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  lr: 2.0e-4
+  embed_lr: 5.0e-4           # lr for the NEW embedding rows only (old rows are gradient-masked)
+  warmup_steps: 50
+  seq_len: 512
+  batch_size: 8
+  grad_accum: 2
+  master_dtype: float32      # float32 master weights + bf16 autocast (use bfloat16 if VRAM < 16GB)
+  gradient_checkpointing: true
+  log_every: 10
+  max_train_tokens: 20000000
+
+eval:
+  split: test                # split for compression / perplexity
+  ppl_batch_size: 16
+  ppl_max_len: 512
+
+flores:
+  split: devtest
+  directions: [eng_Latn-target, target-eng_Latn]   # target = urd_Arab / snd_Arab
+  use_instruct: false        # base model + few-shot by default
+  n_shots: 3
+  max_sentences: null        # null = all 1012
+  max_new_tokens: 256
+  batch_size: 8
+
+latency:
+  n_sentences: 200
+  warmup: 5
+  repeats: 5
+  device: cuda
+
+flores_codes: { ur: urd_Arab, sd: snd_Arab }
+
+# Experiment matrix (guide p.6) + controls added for causal attribution.
+conditions:
+  baseline:    { budget: 0,    init: null,       lora: false }
+  baseline_lora: { budget: 0,  init: null,       lora: true }   # CONTROL: is it the vocab, or just Urdu/Sindhi fine-tuning?
+  A:           { budget: 2000, init: random,     lora: false }
+  B:           { budget: 2000, init: mean,       lora: false }
+  C:           { budget: 2000, init: projection, lora: false }
+  D:           { budget: 2000, init: projection, lora: true }
+  D_mean:      { budget: 2000, init: mean,       lora: true }   # CONTROL: does projection still matter after LoRA?
+  E:           { budget: 4000, init: projection, lora: true }
+  F:           { budget: 8000, init: projection, lora: true }

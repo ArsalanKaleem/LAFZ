@@ -1,0 +1,78 @@
+"""Day 7: embedding initialisation strategies for new tokens. Same vocabulary, only init changes.
+
+  random      N(0, σ²) with σ = std of existing rows                       (lower bound)
+  mean        mean of the base-token embeddings the new token replaces      (constituent baseline)
+  projection  merge-tree ridge projection (+ optional parallel anchor)      (HARF)
+
+Input and output embeddings are handled separately when the model is untied.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from ..projection.align import (apply_projection, base_merge_triples, fit_ridge, nearest_neighbors,
+                                parallel_anchor, write_nn_report)
+from ..utils import log, require_torch, write_json
+from .inject import is_tied
+
+
+def _attach_pair_ids(entries: list[dict], ext_vocab: dict[str, int]) -> None:
+    for e in entries:
+        e["pair_ids"] = [ext_vocab[e["pair"][0]], ext_vocab[e["pair"][1]]]
+
+
+def init_random(E, entries, base_n: int, seed: int):
+    torch = require_torch()
+    g = torch.Generator(device="cpu").manual_seed(seed)
+    std = E[:base_n].float().std().item()
+    rows = torch.randn(len(entries), E.shape[1], generator=g) * std
+    return rows
+
+
+def init_mean(E, entries):
+    torch = require_torch()
+    return torch.stack([E[e["base_piece_ids"]].float().mean(0).cpu() for e in entries])
+
+
+def initialize(model, base_tok, ext_tok, entries: list[dict], strategy: str, cfg: dict, out_dir: Path):
+    """Initialise new rows in-place on `model`; returns (ids, input_rows, output_rows, diagnostics)."""
+    torch = require_torch()
+    base_n = len(base_tok)
+    _attach_pair_ids(entries, ext_tok.get_vocab())
+    ids = [e["id"] for e in entries]
+    tied = is_tied(model)
+    mats = {"input": model.get_input_embeddings().weight}
+    if not tied:
+        mats["output"] = model.get_output_embeddings().weight
+    rows_out, diag = {}, {"strategy": strategy, "tied": tied}
+    pcfg = cfg["projection"]
+    for kind, W in mats.items():
+        with torch.no_grad():
+            if strategy == "random":
+                rows = init_random(W, entries, base_n, cfg["seed"] + (kind == "output"))
+            elif strategy == "mean":
+                rows = init_mean(W, entries)
+            elif strategy == "projection":
+                triples = base_merge_triples(base_tok, pcfg["pairs"], pcfg["max_pairs"], cfg["seed"])
+                if len(triples) < 1000:
+                    log.warning("Only %d base merges for projection (pairs=%s). Consider pairs=all.",
+                                len(triples), pcfg["pairs"])
+                proj = fit_ridge(W, triples, pcfg["lambdas"], pcfg["val_frac"], cfg["seed"])
+                rows = apply_projection(W, proj, entries, pcfg["rescale_norm"]).cpu()
+                diag[f"projection_{kind}"] = proj["diagnostics"]
+                if pcfg.get("lexicon") and kind == "input":
+                    rows, n = parallel_anchor(rows, entries, ext_tok, base_tok, W, pcfg["lexicon"], pcfg["anchor_alpha"])
+                    diag["parallel_anchor_applied"] = n
+                torch.save({k: (v.cpu() if hasattr(v, "cpu") else v) for k, v in proj.items() if k != "diagnostics"},
+                           out_dir / f"projection_{kind}.pt")
+            else:
+                raise ValueError(f"unknown init strategy {strategy!r}")
+            idx = torch.as_tensor(ids, device=W.device)
+            W[idx] = rows.to(W.device, W.dtype)
+        rows_out[kind] = rows.float().cpu()
+        diag[f"{kind}_new_norm_median"] = rows.float().norm(dim=1).median().item()
+        diag[f"{kind}_base_norm_median"] = W[:base_n].float().norm(dim=1).median().item()
+    nns = nearest_neighbors(model.get_input_embeddings().weight, ids, base_n, ext_tok)
+    write_nn_report(out_dir / "nearest_neighbors.md", nns)
+    write_json(out_dir / "init_diagnostics.json", diag)
+    return ids, rows_out["input"], rows_out.get("output"), diag

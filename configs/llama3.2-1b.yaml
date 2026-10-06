@@ -1,0 +1,6 @@
+# Replication model. Llama 3.2 is gated: accept the license on Hugging Face and `huggingface-cli login` first.
+extends: qwen2.5-1.5b.yaml
+model:
+  name: meta-llama/Llama-3.2-1B
+  revision: main
+  instruct_name: meta-llama/Llama-3.2-1B-Instruct
