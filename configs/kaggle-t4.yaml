@@ -1,0 +1,14 @@
+# Kaggle / Colab-free GPUs (T4 16GB, P100 16GB): no bfloat16 support -> float16.
+# Usage: harf run --config configs/kaggle-t4.yaml --lang ur --condition D
+extends: qwen2.5-1.5b.yaml
+model:
+  dtype: float16
+  attn_implementation: sdpa
+lora:
+  autocast_dtype: float16
+  batch_size: 4
+  grad_accum: 4          # same effective batch (16 x 512 tokens) as the main config
+eval:
+  ppl_batch_size: 8
+flores:
+  batch_size: 8

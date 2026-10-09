@@ -87,7 +87,12 @@ def train_lora(cfg: dict, cdir: Path) -> dict:
              f"{n_trainable:,}")
 
     device = model.get_input_embeddings().weight.device
-    autocast = torch.autocast("cuda", dtype=torch.bfloat16, enabled=device.type == "cuda")
+    # bfloat16 needs Ampere+ (A100, RTX 30xx/40xx). T4/P100 (Kaggle, Colab free): use float16 + GradScaler.
+    ac = lcfg.get("autocast_dtype", "bfloat16")
+    use_ac = device.type == "cuda" and ac != "none"
+    ac_dtype = torch.float16 if ac == "float16" else torch.bfloat16
+    autocast = torch.autocast("cuda", dtype=ac_dtype, enabled=use_ac)
+    scaler = torch.amp.GradScaler("cuda", enabled=use_ac and ac == "float16")
     log_f = open(out / "train_log.jsonl", "w")
     model.train()
     bi, t0 = 0, time.time()
@@ -102,10 +107,12 @@ def train_lora(cfg: dict, cdir: Path) -> dict:
                 loss = model(input_ids=x, labels=x).loss / accum
             if not torch.isfinite(loss):
                 raise RuntimeError(f"Non-finite loss at step {step}")
-            loss.backward()
+            scaler.scale(loss).backward()
             tot += loss.item()
+        scaler.unscale_(opt)
         torch.nn.utils.clip_grad_norm_([p for g in groups for p in g["params"]], 1.0)
-        opt.step()
+        scaler.step(opt)
+        scaler.update()
         sched.step()
         if step % lcfg["log_every"] == 0 or step == steps - 1:
             rec = {"step": step, "loss": tot, "lr": sched.get_last_lr()[0], "tokens_seen": bi * lcfg["seq_len"],

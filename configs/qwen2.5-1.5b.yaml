@@ -65,7 +65,8 @@ lora:
   seq_len: 512
   batch_size: 8
   grad_accum: 2
-  master_dtype: float32      # float32 master weights + bf16 autocast (use bfloat16 if VRAM < 16GB)
+  master_dtype: float32      # float32 master weights (+ autocast below)
+  autocast_dtype: bfloat16   # bfloat16 (A100/RTX30xx+) | float16 (T4/P100: Kaggle, Colab free) | none
   gradient_checkpointing: true
   log_every: 10
   max_train_tokens: 20000000
