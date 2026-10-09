@@ -1,0 +1,82 @@
+From 2618458bb43c5716ede6c531133523c5770499f6 Mon Sep 17 00:00:00 2001
+From: harf <harf@local>
+Date: Fri, 9 Oct 2026 21:11:50 +0000
+Subject: [PATCH] Support float16 GPUs (T4/P100): GradScaler + kaggle-t4 config
+
+---
+ configs/kaggle-t4.yaml    | 14 ++++++++++++++
+ configs/qwen2.5-1.5b.yaml |  3 ++-
+ src/harf/training/lora.py | 13 ++++++++++---
+ 3 files changed, 26 insertions(+), 4 deletions(-)
+ create mode 100644 configs/kaggle-t4.yaml
+
+diff --git a/configs/kaggle-t4.yaml b/configs/kaggle-t4.yaml
+new file mode 100644
+index 0000000..4cb5d09
+--- /dev/null
++++ b/configs/kaggle-t4.yaml
+@@ -0,0 +1,14 @@
++# Kaggle / Colab-free GPUs (T4 16GB, P100 16GB): no bfloat16 support -> float16.
++# Usage: harf run --config configs/kaggle-t4.yaml --lang ur --condition D
++extends: qwen2.5-1.5b.yaml
++model:
++  dtype: float16
++  attn_implementation: sdpa
++lora:
++  autocast_dtype: float16
++  batch_size: 4
++  grad_accum: 4          # same effective batch (16 x 512 tokens) as the main config
++eval:
++  ppl_batch_size: 8
++flores:
++  batch_size: 8
+diff --git a/configs/qwen2.5-1.5b.yaml b/configs/qwen2.5-1.5b.yaml
+index 0043cc4..efbb1c0 100644
+--- a/configs/qwen2.5-1.5b.yaml
++++ b/configs/qwen2.5-1.5b.yaml
+@@ -65,7 +65,8 @@ lora:
+   seq_len: 512
+   batch_size: 8
+   grad_accum: 2
+-  master_dtype: float32      # float32 master weights + bf16 autocast (use bfloat16 if VRAM < 16GB)
++  master_dtype: float32      # float32 master weights (+ autocast below)
++  autocast_dtype: bfloat16   # bfloat16 (A100/RTX30xx+) | float16 (T4/P100: Kaggle, Colab free) | none
+   gradient_checkpointing: true
+   log_every: 10
+   max_train_tokens: 20000000
+diff --git a/src/harf/training/lora.py b/src/harf/training/lora.py
+index d67694d..30a3954 100644
+--- a/src/harf/training/lora.py
++++ b/src/harf/training/lora.py
+@@ -87,7 +87,12 @@ def train_lora(cfg: dict, cdir: Path) -> dict:
+              f"{n_trainable:,}")
+ 
+     device = model.get_input_embeddings().weight.device
+-    autocast = torch.autocast("cuda", dtype=torch.bfloat16, enabled=device.type == "cuda")
++    # bfloat16 needs Ampere+ (A100, RTX 30xx/40xx). T4/P100 (Kaggle, Colab free): use float16 + GradScaler.
++    ac = lcfg.get("autocast_dtype", "bfloat16")
++    use_ac = device.type == "cuda" and ac != "none"
++    ac_dtype = torch.float16 if ac == "float16" else torch.bfloat16
++    autocast = torch.autocast("cuda", dtype=ac_dtype, enabled=use_ac)
++    scaler = torch.amp.GradScaler("cuda", enabled=use_ac and ac == "float16")
+     log_f = open(out / "train_log.jsonl", "w")
+     model.train()
+     bi, t0 = 0, time.time()
+@@ -102,10 +107,12 @@ def train_lora(cfg: dict, cdir: Path) -> dict:
+                 loss = model(input_ids=x, labels=x).loss / accum
+             if not torch.isfinite(loss):
+                 raise RuntimeError(f"Non-finite loss at step {step}")
+-            loss.backward()
++            scaler.scale(loss).backward()
+             tot += loss.item()
++        scaler.unscale_(opt)
+         torch.nn.utils.clip_grad_norm_([p for g in groups for p in g["params"]], 1.0)
+-        opt.step()
++        scaler.step(opt)
++        scaler.update()
+         sched.step()
+         if step % lcfg["log_every"] == 0 or step == steps - 1:
+             rec = {"step": step, "loss": tot, "lr": sched.get_last_lr()[0], "tokens_seen": bi * lcfg["seq_len"],
+-- 
+2.43.0
+

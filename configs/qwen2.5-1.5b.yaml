@@ -6,7 +6,7 @@ lang: ur                     # ur | sd | ur+sd   (one language at a time first)
 
 model:
   name: Qwen/Qwen2.5-1.5B    # base LM for compression / perplexity / LoRA
-  revision: main             # PIN THIS to a commit hash on Day 1 (huggingface.co/<model>/commits/main)
+  revision: 8faed761d45a263340a0528343f099c05c9a4323             # PIN THIS to a commit hash on Day 1 (huggingface.co/<model>/commits/main)
   instruct_name: Qwen/Qwen2.5-1.5B-Instruct   # optional, used for FLORES if flores.use_instruct=true
   dtype: bfloat16            # inference dtype
   attn_implementation: sdpa
