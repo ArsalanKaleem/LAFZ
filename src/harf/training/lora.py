@@ -1,9 +1,12 @@
 """Day 9: LoRA adapter + training of ONLY the new embedding rows.
 
 Why not just LoRA? LoRA alone cannot change embedding rows, so new tokens would stay at their
-initialisation. Why not modules_to_save=[embed_tokens]? That trains (and stores) the whole
-151k x d matrix. Instead we unfreeze the embedding and mask gradients of all pre-existing rows
-(weight decay disabled on that group so old rows are bit-for-bit unchanged; this is asserted at the end).
+initialisation. Why not unfreeze the embedding matrix? Its gradient + Adam states for all ~154k rows
+cost ~4 GB and run a 16 GB T4 out of memory. Instead the embedding matrix stays FROZEN and a small
+trainable table `delta` (n_new x d, ~12 MB) is added through two forward hooks:
+    input  : embed(id) += delta[id - first_new]                 for new ids
+    output : logits[:, first_new:first_new+n] += h @ delta.T     (tied models: same delta)
+so the effective new rows are E_init[new] + delta. Old rows cannot change.
 """
 from __future__ import annotations
 
@@ -37,6 +40,37 @@ def packed_blocks(tok, texts: list[str], seq_len: int, max_tokens: int, seed: in
     return blocks
 
 
+class NewRowDelta:
+    """Trainable corrections for new embedding rows, applied via hooks (embedding matrix stays frozen)."""
+
+    def __init__(self, model, first: int, n: int, tied: bool):
+        torch = require_torch()
+        emb, head = model.get_input_embeddings(), model.get_output_embeddings()
+        d, dev = emb.weight.shape[1], emb.weight.device
+        self.first, self.n = first, n
+        self.d_in = torch.nn.Parameter(torch.zeros(n, d, device=dev, dtype=torch.float32))
+        self.d_out = self.d_in if tied else torch.nn.Parameter(torch.zeros(n, d, device=dev, dtype=torch.float32))
+        self.params = [self.d_in] if tied else [self.d_in, self.d_out]
+        self.handles = [emb.register_forward_hook(self._emb_hook), head.register_forward_hook(self._head_hook)]
+
+    def _emb_hook(self, module, inputs, out):
+        ids = inputs[0]
+        rel = ids - self.first
+        mask = ((rel >= 0) & (rel < self.n)).unsqueeze(-1)
+        add = self.d_in[rel.clamp(0, self.n - 1)] * mask
+        return out + add.to(out.dtype)
+
+    def _head_hook(self, module, inputs, out):
+        h = inputs[0]
+        extra = h @ self.d_out.to(h.dtype).T
+        out[..., self.first:self.first + self.n] += extra.to(out.dtype)
+        return out
+
+    def remove(self):
+        for h in self.handles:
+            h.remove()
+
+
 def train_lora(cfg: dict, cdir: Path) -> dict:
     torch = require_torch()
     from peft import LoraConfig, get_peft_model
@@ -60,18 +94,11 @@ def train_lora(cfg: dict, cdir: Path) -> dict:
 
     lora_params = [p for n, p in model.named_parameters() if p.requires_grad]
     groups = [{"params": lora_params, "lr": lcfg["lr"], "weight_decay": 0.0}]
-    emb_params, snapshots = [], {}
+    delta = None
     if new_ids:
-        emb = model.get_input_embeddings()
-        mats = [emb.weight] + ([] if is_tied(model) else [model.get_output_embeddings().weight])
-        mask = torch.zeros(emb.weight.shape[0], 1, device=emb.weight.device, dtype=emb.weight.dtype)
-        mask[new_ids] = 1
-        for w in mats:
-            w.requires_grad_(True)
-            w.register_hook(lambda g, m=mask: g * m.to(g.dtype))
-            emb_params.append(w)
-            snapshots[id(w)] = w.detach()[: base_len].float().sum().item()
-        groups.append({"params": emb_params, "lr": lcfg["embed_lr"], "weight_decay": 0.0})
+        assert not model.get_input_embeddings().weight.requires_grad, "embedding matrix must stay frozen"
+        delta = NewRowDelta(model, base_len, len(new_ids), is_tied(model))
+        groups.append({"params": delta.params, "lr": lcfg["embed_lr"], "weight_decay": 0.0})
     opt = torch.optim.AdamW(groups, betas=(0.9, 0.95))
 
     texts = [r["text"] for r in load_split_multi(cfg, "train")]
@@ -82,7 +109,7 @@ def train_lora(cfg: dict, cdir: Path) -> dict:
     warm = max(1, lcfg["warmup_steps"])
     sched = torch.optim.lr_scheduler.LambdaLR(
         opt, lambda s: min(1.0, (s + 1) / warm) * 0.5 * (1 + math.cos(math.pi * min(s, steps) / steps)))
-    n_trainable = sum(p.numel() for p in lora_params) + len(new_ids) * model.get_input_embeddings().weight.shape[1]
+    n_trainable = sum(p.numel() for p in lora_params) + (sum(p.numel() for p in delta.params) if delta else 0)
     log.info("LoRA: %d blocks of %d tokens, %d steps, trainable≈%s params", len(blocks), lcfg["seq_len"], steps,
              f"{n_trainable:,}")
 
@@ -123,15 +150,18 @@ def train_lora(cfg: dict, cdir: Path) -> dict:
     log_f.close()
 
     model.eval()
-    for w in emb_params:  # old rows must be untouched
-        drift = abs(w.detach()[: base_len].float().sum().item() - snapshots[id(w)])
-        if drift > 1e-3:
-            raise RuntimeError(f"Pre-existing embedding rows changed during training (drift={drift}).")
+    if delta is not None:
+        import torch as _t
+        with _t.no_grad():
+            ids_t = _t.as_tensor(new_ids, device=device)
+            rows_in = model.get_input_embeddings().weight[ids_t].float() + delta.d_in.detach()
+            rows_out = None if is_tied(model) else model.get_output_embeddings().weight[ids_t].float() + delta.d_out.detach()
+            log.info("new-row correction: mean |delta| / mean |row| = %.3f",
+                     (delta.d_in.norm(dim=1).mean() / rows_in.norm(dim=1).mean()).item())
+        delta.remove()
     model.save_pretrained(str(out / "adapter"), save_embedding_layers=False)
-    if new_ids:
-        emb_w = model.get_input_embeddings().weight
-        out_w = None if is_tied(model) else model.get_output_embeddings().weight[new_ids]
-        save_rows(out / "new_rows.pt", new_ids, emb_w[new_ids], out_w, {"source": "lora"})
+    if delta is not None:
+        save_rows(out / "new_rows.pt", new_ids, rows_in, rows_out, {"source": "lora+delta"})
     summary = {"steps": steps, "final_loss": tot, "trainable_params": n_trainable, "lora_r": lcfg["r"],
                "seq_len": lcfg["seq_len"], "n_blocks": len(blocks), "wall_s": round(time.time() - t0, 1)}
     write_json(out / "train_summary.json", summary)
