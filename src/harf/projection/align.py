@@ -41,8 +41,20 @@ def base_merge_triples(base_tok, which: str = "arabic", max_pairs: int | None = 
     return out
 
 
+def base_merge_map(base_tok) -> dict[int, tuple[int, int]]:
+    """result_id -> (a_id, b_id) for every base merge (used for chained validation)."""
+    tj = backend_json(base_tok)
+    vocab = tj["model"]["vocab"]
+    out = {}
+    for m in tj["model"]["merges"]:
+        a, b = m.split(" ", 1) if isinstance(m, str) else m
+        if a in vocab and b in vocab and (a + b) in vocab:
+            out.setdefault(vocab[a + b], (vocab[a], vocab[b]))
+    return out
+
+
 def fit_ridge(E, triples, lambdas, val_frac: float = 0.1, seed: int = 0, residual: bool = True,
-              select_by: str = "mrr", chunk: int = 8192, n_retrieval: int = 2000) -> dict:
+              select_by: str = "mrr", chunk: int = 8192, n_retrieval: int = 2000, chain_map: dict | None = None) -> dict:
     """Closed-form ridge with intercept, memory-safe (statistics accumulated in chunks).
 
     residual=True  : predict the CORRECTION  E[ab] - mean(E[a], E[b]);  pred = mean + W·x + c.
@@ -51,6 +63,10 @@ def fit_ridge(E, triples, lambdas, val_frac: float = 0.1, seed: int = 0, residua
                      prediction toward the average embedding -> collapsed, hard-to-distinguish rows).
     select_by="mrr": choose lambda by held-out retrieval (is each prediction nearest to ITS OWN
                      target among 2000 candidates?), which penalises collapse. "cos" = mean cosine.
+    Residual mode has NO intercept (a shared offset added to every new row causes collapse), and
+    lambda=inf (W=0, i.e. exactly mean-of-parts) is always a candidate, so selection can fall back to it.
+    chain_map: if given, selection uses CHAINED validation: the parts a, b are themselves predicted
+    from their own merges first, as happens when new tokens are built from other new tokens.
     """
     torch = require_torch()
     import torch.nn.functional as F
@@ -80,6 +96,8 @@ def fit_ridge(E, triples, lambdas, val_frac: float = 0.1, seed: int = 0, residua
             sy += Y.sum(0).double()
             norms.append(ab.norm(dim=1).cpu())
         xm, ym = (sx / len(tr)).float(), (sy / len(tr)).float()
+        if residual:
+            ym = torch.zeros_like(ym)  # no shared offset
         XtX = torch.zeros(2 * d, 2 * d, dtype=torch.float64, device=dev)
         XtY = torch.zeros(2 * d, d, dtype=torch.float64, device=dev)
         for i in range(0, len(tr), chunk):
@@ -107,12 +125,41 @@ def fit_ridge(E, triples, lambdas, val_frac: float = 0.1, seed: int = 0, residua
                     "cos": F.cosine_similarity(P, T, dim=1).mean().item(),
                     "mean_pairwise_cos": (off / (n * (n - 1))).item()}
 
+        # chained validation: replace each part by its own prediction when it is itself a merge result
+        chain = None
+        if chain_map:
+            def parts(ids):
+                kids = [chain_map.get(int(i)) for i in ids.tolist()]
+                has = torch.tensor([k is not None for k in kids], device=dev)
+                k1 = torch.tensor([k[0] if k else 0 for k in kids], device=dev)
+                k2 = torch.tensor([k[1] if k else 0 for k in kids], device=dev)
+                return has, k1, k2
+            vd = val.to(dev)
+            chain = (parts(vd[:, 0]), parts(vd[:, 1]))
+            log.info("chained validation: %.0f%% of val parts are themselves merges",
+                     50 * (chain[0][0].float().mean() + chain[1][0].float().mean()).item())
+
+        def chained_X(W):
+            outs = []
+            for (has, k1, k2), col in zip(chain, (0, 1)):
+                real = W_emb[val[:, col].to(dev)].float()
+                ka, kb = W_emb[k1].float(), W_emb[k2].float()
+                pred = predict(W, torch.cat([ka, kb], 1), 0.5 * (ka + kb))
+                outs.append(torch.where(has.unsqueeze(1), pred, real))
+            return torch.cat(outs, 1), 0.5 * (outs[0] + outs[1])
+
+        candidates = [(lam, torch.linalg.solve(XtX + lam * scale * I, XtY).float()) for lam in lambdas]
+        if residual:
+            candidates.append((float("inf"), torch.zeros(2 * d, d, device=dev)))
         results, best = [], None
-        for lam in lambdas:
-            W = torch.linalg.solve(XtX + lam * scale * I, XtY).float()
+        for lam, W in candidates:
             m = retrieval(predict(W, Xva, MEANva), ABva)
+            if chain is not None:
+                Xc2, M2 = chained_X(W)
+                mc = retrieval(predict(W, Xc2, M2), ABva)
+                m.update({f"chained_{k}": v for k, v in mc.items()})
             results.append({"lambda": lam, **m})
-            key = m[select_by]
+            key = m[f"chained_{select_by}"] if chain is not None else m[select_by]
             if best is None or key > best[0]:
                 best = (key, lam, W, m)
         _, lam, W, m = best
@@ -129,8 +176,8 @@ def fit_ridge(E, triples, lambdas, val_frac: float = 0.1, seed: int = 0, residua
              "pairwise=%.3f | true pairwise=%.3f", residual, lam, m["mrr"], m["top1"], m["cos"], m["mean_pairwise_cos"],
              diag["val_mean_of_parts"]["mrr"], diag["val_mean_of_parts"]["cos"],
              diag["val_mean_of_parts"]["mean_pairwise_cos"], diag["val_true_targets_mean_pairwise_cos"])
-    if lam == max(lambdas) and residual:
-        log.warning("Best lambda is the largest tried: the learned correction adds little beyond mean-of-parts.")
+    if residual and lam == float("inf"):
+        log.warning("Selected lambda=inf: the learned correction does NOT beat plain mean-of-parts on validation.")
     return {"W": W, "x_mean": xm, "y_mean": ym, "residual": residual, "target_norm": target_norm,
             "diagnostics": diag}
 

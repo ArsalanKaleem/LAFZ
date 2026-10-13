@@ -54,6 +54,8 @@ def load_config(path: str, overrides: list[str] | None = None, lang: str | None 
             raise KeyError(f"Unknown condition {condition!r}; known: {list(cfg.get('conditions', {}))}")
         cfg["condition"] = condition
         cfg["cond"] = dict(cfg["conditions"][condition])
+        # per-condition settings, e.g.  C_arabic: {..., overrides: {projection: {pairs: arabic}}}
+        cfg = deep_update(cfg, cfg["cond"].get("overrides", {}))
     cfg["_config_path"] = str(path)
     return cfg
 
