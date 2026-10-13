@@ -9,6 +9,6 @@ lora:
   batch_size: 4
   grad_accum: 4          # same effective batch (16 x 512 tokens) as the main config
 eval:
-  ppl_batch_size: 8
+  ppl_batch_size: 4
 flores:
   batch_size: 8

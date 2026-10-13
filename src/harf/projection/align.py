@@ -41,8 +41,17 @@ def base_merge_triples(base_tok, which: str = "arabic", max_pairs: int | None = 
     return out
 
 
-def fit_ridge(E, triples, lambdas, val_frac: float = 0.1, seed: int = 0) -> dict:
-    """Closed-form ridge with intercept; lambda chosen on held-out merges by mean cosine."""
+def fit_ridge(E, triples, lambdas, val_frac: float = 0.1, seed: int = 0, residual: bool = True,
+              select_by: str = "mrr", chunk: int = 8192, n_retrieval: int = 2000) -> dict:
+    """Closed-form ridge with intercept, memory-safe (statistics accumulated in chunks).
+
+    residual=True  : predict the CORRECTION  E[ab] - mean(E[a], E[b]);  pred = mean + W·x + c.
+                     As lambda -> inf this reduces exactly to mean-of-parts init.
+    residual=False : predict E[ab] directly (original "projection_direct"; regresses every
+                     prediction toward the average embedding -> collapsed, hard-to-distinguish rows).
+    select_by="mrr": choose lambda by held-out retrieval (is each prediction nearest to ITS OWN
+                     target among 2000 candidates?), which penalises collapse. "cos" = mean cosine.
+    """
     torch = require_torch()
     import torch.nn.functional as F
     g = torch.Generator().manual_seed(seed)
@@ -51,57 +60,93 @@ def fit_ridge(E, triples, lambdas, val_frac: float = 0.1, seed: int = 0) -> dict
     n_val = max(int(len(t) * val_frac), 1)
     val, tr = t[:n_val], t[n_val:]
     dev = E.device
-    E32 = E.float()
+    W_emb = E.detach()
+    d = W_emb.shape[1]
 
     def XY(tt):
         tt = tt.to(dev)
-        return torch.cat([E32[tt[:, 0]], E32[tt[:, 1]]], dim=1), E32[tt[:, 2]]
+        a, b, ab = W_emb[tt[:, 0]].float(), W_emb[tt[:, 1]].float(), W_emb[tt[:, 2]].float()
+        X = torch.cat([a, b], dim=1)
+        Y = ab - 0.5 * (a + b) if residual else ab
+        return X, Y, ab, 0.5 * (a + b)
 
-    Xtr, Ytr = XY(tr)
-    Xva, Yva = XY(val)
-    xm, ym = Xtr.mean(0, keepdim=True), Ytr.mean(0, keepdim=True)
-    Xc, Yc = (Xtr - xm).double(), (Ytr - ym).double()
-    XtX, XtY = Xc.T @ Xc, Xc.T @ Yc
-    scale = torch.trace(XtX) / XtX.shape[0]
-    I = torch.eye(XtX.shape[0], dtype=XtX.dtype, device=dev)
-    best = None
-    results = []
-    for lam in lambdas:
-        W = torch.linalg.solve(XtX + lam * scale * I, XtY).float()
-        pred = (Xva - xm) @ W + ym
-        cos = F.cosine_similarity(pred, Yva, dim=1).mean().item()
-        results.append({"lambda": lam, "val_cos": cos})
-        if best is None or cos > best[1]:
-            best = (lam, cos, W)
-    lam, cos, W = best
-    d = E.shape[1]
-    mean_pred = 0.5 * (Xva[:, :d] + Xva[:, d:])
-    rnd = torch.randn_like(Yva) * E32.std()
-    target_norm = Ytr.norm(dim=1).median().item()
-    diag = {
-        "n_train": len(tr), "n_val": len(val), "lambda_search": results, "best_lambda": lam,
-        "val_cos_projection": cos,
-        "val_cos_mean_of_parts": F.cosine_similarity(mean_pred, Yva, dim=1).mean().item(),
-        "val_cos_random": F.cosine_similarity(rnd, Yva, dim=1).mean().item(),
-        "val_norm_ratio_projection": (((Xva - xm) @ W + ym).norm(dim=1).median() / Yva.norm(dim=1).median()).item(),
-        "target_norm_median": target_norm,
-    }
-    log.info("projection: best λ=%s val_cos=%.3f (mean-of-parts %.3f, random %.3f)", lam, cos,
-             diag["val_cos_mean_of_parts"], diag["val_cos_random"])
-    return {"W": W, "x_mean": xm, "y_mean": ym, "target_norm": target_norm, "diagnostics": diag}
+    with torch.no_grad():
+        sx = torch.zeros(2 * d, dtype=torch.float64, device=dev)
+        sy = torch.zeros(d, dtype=torch.float64, device=dev)
+        norms = []
+        for i in range(0, len(tr), chunk):
+            X, Y, ab, _ = XY(tr[i:i + chunk])
+            sx += X.sum(0).double()
+            sy += Y.sum(0).double()
+            norms.append(ab.norm(dim=1).cpu())
+        xm, ym = (sx / len(tr)).float(), (sy / len(tr)).float()
+        XtX = torch.zeros(2 * d, 2 * d, dtype=torch.float64, device=dev)
+        XtY = torch.zeros(2 * d, d, dtype=torch.float64, device=dev)
+        for i in range(0, len(tr), chunk):
+            X, Y, _, _ = XY(tr[i:i + chunk])
+            Xc, Yc = X - xm, Y - ym
+            XtX += (Xc.T @ Xc).double()
+            XtY += (Xc.T @ Yc).double()
+            del X, Y, Xc, Yc
+        scale = torch.trace(XtX) / XtX.shape[0]
+        I = torch.eye(2 * d, dtype=torch.float64, device=dev)
+
+        Xva, Yva, ABva, MEANva = XY(val)
+
+        def predict(W, X, mean_parts):
+            y = (X - xm) @ W + ym
+            return y + mean_parts if residual else y
+
+        def retrieval(P, T):
+            n = min(n_retrieval, len(P))
+            Pn, Tn = F.normalize(P[:n], dim=1), F.normalize(T[:n], dim=1)
+            S = Pn @ Tn.T
+            ranks = (S > S.diag().unsqueeze(1)).sum(1) + 1
+            off = (Pn @ Pn.T).sum() - n
+            return {"mrr": (1.0 / ranks.float()).mean().item(), "top1": (ranks == 1).float().mean().item(),
+                    "cos": F.cosine_similarity(P, T, dim=1).mean().item(),
+                    "mean_pairwise_cos": (off / (n * (n - 1))).item()}
+
+        results, best = [], None
+        for lam in lambdas:
+            W = torch.linalg.solve(XtX + lam * scale * I, XtY).float()
+            m = retrieval(predict(W, Xva, MEANva), ABva)
+            results.append({"lambda": lam, **m})
+            key = m[select_by]
+            if best is None or key > best[0]:
+                best = (key, lam, W, m)
+        _, lam, W, m = best
+        diag = {
+            "residual": residual, "select_by": select_by, "n_train": len(tr), "n_val": len(val),
+            "lambda_search": results, "best_lambda": lam, "val_projection": m,
+            "val_mean_of_parts": retrieval(MEANva, ABva),
+            "val_random": retrieval(torch.randn_like(ABva) * W_emb[:1000].float().std(), ABva),
+            "val_true_targets_mean_pairwise_cos": retrieval(ABva, ABva)["mean_pairwise_cos"],
+        }
+    target_norm = torch.cat(norms).median().item()
+    diag["target_norm_median"] = target_norm
+    log.info("projection(residual=%s): best λ=%s  MRR=%.3f top1=%.3f cos=%.3f pairwise=%.3f | mean-of-parts MRR=%.3f cos=%.3f "
+             "pairwise=%.3f | true pairwise=%.3f", residual, lam, m["mrr"], m["top1"], m["cos"], m["mean_pairwise_cos"],
+             diag["val_mean_of_parts"]["mrr"], diag["val_mean_of_parts"]["cos"],
+             diag["val_mean_of_parts"]["mean_pairwise_cos"], diag["val_true_targets_mean_pairwise_cos"])
+    if lam == max(lambdas) and residual:
+        log.warning("Best lambda is the largest tried: the learned correction adds little beyond mean-of-parts.")
+    return {"W": W, "x_mean": xm, "y_mean": ym, "residual": residual, "target_norm": target_norm,
+            "diagnostics": diag}
 
 
-def apply_projection(E, proj: dict, entries: list[dict], rescale_norm: bool = True):
-    """Initialise new rows in merge order. `entries` have 'pair' (byte-level strings) and 'id';
-    `vocab_ext` maps strings to ids for both base and new tokens. E must already be resized."""
+def apply_projection(E, proj: dict, entries: list[dict], rescale_norm: bool = False):
+    """Initialise new rows in merge order (children before parents). Entries need 'id' and 'pair_ids'."""
     torch = require_torch()
     W, xm, ym = proj["W"], proj["x_mean"], proj["y_mean"]
     rows = []
     with torch.no_grad():
-        for e in entries:  # merge order == id order -> parents after children
+        for e in entries:
             a_id, b_id = e["pair_ids"]
-            x = torch.cat([E[a_id].float(), E[b_id].float()]).unsqueeze(0)
-            y = ((x - xm) @ W + ym).squeeze(0)
+            a, b = E[a_id].float(), E[b_id].float()
+            y = ((torch.cat([a, b]).unsqueeze(0) - xm) @ W + ym).squeeze(0)
+            if proj.get("residual"):
+                y = y + 0.5 * (a + b)
             if rescale_norm:
                 y = y * (proj["target_norm"] / y.norm().clamp_min(1e-6))
             E[e["id"]] = y.to(E.dtype)
@@ -134,6 +179,7 @@ def parallel_anchor(E_new_rows, entries, ext_tok, base_tok, E_base, lexicon_path
 def nearest_neighbors(E, new_ids, base_n: int, tok, k: int = 5, sample: int = 40) -> list[dict]:
     torch = require_torch()
     import torch.nn.functional as F
+    E = E.detach()
     base = F.normalize(E[:base_n].float(), dim=1)
     out = []
     for i in new_ids[:sample]:

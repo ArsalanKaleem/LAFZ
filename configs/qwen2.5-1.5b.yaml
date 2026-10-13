@@ -48,8 +48,10 @@ projection:
   pairs: arabic              # which base merges to learn W from: all | arabic
   max_pairs: 120000
   val_frac: 0.1
-  lambdas: [0.01, 0.1, 1.0, 10.0, 100.0]   # relative ridge strengths (scaled by mean eigenvalue)
-  rescale_norm: true
+  residual: true             # predict a correction to mean-of-parts (lambda -> inf == mean init)
+  select_by: mrr             # choose lambda by held-out retrieval, not cosine (cosine rewards collapse)
+  lambdas: [0.01, 0.1, 1.0, 10.0, 100.0, 1000.0, 10000.0]   # relative ridge strengths
+  rescale_norm: false
   lexicon: null              # optional TSV: <target_word>\t<english_word>  (parallel anchor)
   anchor_alpha: 0.3
 
@@ -74,7 +76,7 @@ lora:
 eval:
   split: test                # split for compression / perplexity
   ppl_batch_size: 16
-  ppl_max_len: 512
+  ppl_max_len: 2048         # must exceed the longest BASELINE sentence, or truncation biases the comparison
 
 flores:
   split: devtest
@@ -100,6 +102,7 @@ conditions:
   A:           { budget: 2000, init: random,     lora: false }
   B:           { budget: 2000, init: mean,       lora: false }
   C:           { budget: 2000, init: projection, lora: false }
+  C_direct:    { budget: 2000, init: projection_direct, lora: false }   # ablation: original direct regression (collapses)
   D:           { budget: 2000, init: projection, lora: true }
   D_mean:      { budget: 2000, init: mean,       lora: true }   # CONTROL: does projection still matter after LoRA?
   E:           { budget: 4000, init: projection, lora: true }
