@@ -51,8 +51,12 @@ def generate(model, tok, prompts: list[str], max_new_tokens: int, batch_size: in
     with torch.inference_mode():
         for i in range(0, len(prompts), batch_size):
             batch = tok(prompts[i:i + batch_size], return_tensors="pt", padding=True, add_special_tokens=False).to(device)
-            gen = model.generate(**batch, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1,
-                                 pad_token_id=tok.pad_token_id, suppress_tokens=suppress or None)
+            kw = dict(max_new_tokens=max_new_tokens, do_sample=False, num_beams=1,
+                      pad_token_id=tok.pad_token_id, suppress_tokens=suppress or None)
+            try:  # stop each row at the end of its translation line (identical rule for all conditions)
+                gen = model.generate(**batch, **kw, stop_strings=["\n"], tokenizer=tok)
+            except (TypeError, ValueError):
+                gen = model.generate(**batch, **kw)
             for row in gen[:, batch["input_ids"].shape[1]:]:
                 text = tok.decode(row, skip_special_tokens=True)
                 outs.append(text.strip().split("\n")[0].strip())  # first line = translation

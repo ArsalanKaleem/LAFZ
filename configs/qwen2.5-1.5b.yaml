@@ -108,5 +108,8 @@ conditions:
   C_arabic:    { budget: 2000, init: projection, lora: false, overrides: { projection: { pairs: arabic } } }  # ablation
   D:           { budget: 2000, init: projection, lora: true }
   D_mean:      { budget: 2000, init: mean,       lora: true }   # CONTROL: does projection still matter after LoRA?
+  # Equal-DATA controls: half the steps = same Urdu text as baseline_lora (extended tokens hold ~2x text)
+  D_750:       { budget: 2000, init: projection, lora: true, overrides: { lora: { steps: 750 } } }
+  D_mean_750:  { budget: 2000, init: mean,       lora: true, overrides: { lora: { steps: 750 } } }
   E:           { budget: 4000, init: projection, lora: true }
   F:           { budget: 8000, init: projection, lora: true }
