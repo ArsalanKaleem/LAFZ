@@ -50,7 +50,8 @@ projection:
   chained_validation: true   # select lambda on 2-level chains (new tokens are built from new tokens)
   val_frac: 0.1
   residual: true             # predict a correction to mean-of-parts (lambda -> inf == mean init)
-  select_by: mrr             # choose lambda by held-out retrieval, not cosine (cosine rewards collapse)
+  select_by: bpc             # choose lambda by BPC on validation sentences (embedding proxies disagreed with BPC)
+  dev_sentences: 200         # from the VALID split; final numbers come from the TEST split
   lambdas: [0.01, 0.1, 1.0, 10.0, 100.0, 1000.0, 10000.0]   # relative ridge strengths
   rescale_norm: false
   lexicon: null              # optional TSV: <target_word>\t<english_word>  (parallel anchor)

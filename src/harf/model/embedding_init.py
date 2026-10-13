@@ -46,7 +46,16 @@ def _mean_pairwise_cos(R, n: int = 1000, seed: int = 0) -> float:
     return ((Z @ Z.T).sum() - k).item() / max(k * (k - 1), 1)
 
 
-def initialize(model, base_tok, ext_tok, entries: list[dict], strategy: str, cfg: dict, out_dir: Path):
+def dev_bpc(model, tok, texts: list[str]) -> float:
+    """Bits per character on a small VALIDATION sample (used only to choose lambda)."""
+    import math
+    from ..evaluation.perplexity import sentence_nll
+    nll, _ = sentence_nll(model, tok, texts, batch_size=8, max_len=2048)
+    return float(nll.sum() / (math.log(2) * sum(len(t) for t in texts)))
+
+
+def initialize(model, base_tok, ext_tok, entries: list[dict], strategy: str, cfg: dict, out_dir: Path,
+               dev_texts: list[str] | None = None):
     """Initialise new rows in-place on `model`; returns (ids, input_rows, output_rows, diagnostics)."""
     torch = require_torch()
     base_n = len(base_tok)
@@ -72,15 +81,33 @@ def initialize(model, base_tok, ext_tok, entries: list[dict], strategy: str, cfg
                 if len(triples) < 1000:
                     log.warning("Only %d base merges for projection (pairs=%s). Consider pairs=all.",
                                 len(triples), pc["pairs"])
+                by_bpc = pc.get("select_by") == "bpc"
                 proj = fit_ridge(W, triples, pc["lambdas"], pc["val_frac"], cfg["seed"],
-                                 residual=pc.get("residual", True), select_by=pc.get("select_by", "mrr"),
+                                 residual=pc.get("residual", True), select_by="mrr" if by_bpc else pc.get("select_by", "mrr"),
                                  chain_map=base_merge_map(base_tok) if pc.get("chained_validation", True) else None)
+                if by_bpc and kind == "input" and dev_texts:
+                    # choose lambda by actual language-modelling quality on validation sentences
+                    model.eval()
+                    search = []
+                    for lam, Wc in proj["candidates"]:
+                        apply_projection(W, {**proj, "W": Wc}, entries, pc.get("rescale_norm", False))
+                        b = dev_bpc(model, ext_tok, dev_texts)
+                        search.append({"lambda": lam, "dev_bpc": b})
+                        log.info("  λ=%s  dev BPC=%.4f", lam, b)
+                    best = min(search, key=lambda r: r["dev_bpc"])
+                    proj["W"] = dict(proj["candidates"])[best["lambda"]]
+                    diag["bpc_lambda_search"] = search
+                    diag["best_lambda_by_dev_bpc"] = best["lambda"]
+                    log.info("projection: λ chosen by dev BPC = %s (%.4f)", best["lambda"], best["dev_bpc"])
+                    if best["lambda"] == float("inf"):
+                        log.warning("Dev BPC prefers λ=inf: the learned correction does not help over mean-of-parts.")
                 rows = apply_projection(W, proj, entries, pc.get("rescale_norm", False)).cpu()
                 diag[f"projection_{kind}"] = proj["diagnostics"]
                 if pcfg.get("lexicon") and kind == "input":
                     rows, n = parallel_anchor(rows, entries, ext_tok, base_tok, W, pcfg["lexicon"], pcfg["anchor_alpha"])
                     diag["parallel_anchor_applied"] = n
-                torch.save({k: (v.cpu() if hasattr(v, "cpu") else v) for k, v in proj.items() if k != "diagnostics"},
+                torch.save({k: (v.cpu() if hasattr(v, "cpu") else v) for k, v in proj.items()
+                            if k not in ("diagnostics", "candidates")},
                            out_dir / f"projection_{kind}.pt")
             else:
                 raise ValueError(f"unknown init strategy {strategy!r}")

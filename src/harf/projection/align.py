@@ -179,7 +179,7 @@ def fit_ridge(E, triples, lambdas, val_frac: float = 0.1, seed: int = 0, residua
     if residual and lam == float("inf"):
         log.warning("Selected lambda=inf: the learned correction does NOT beat plain mean-of-parts on validation.")
     return {"W": W, "x_mean": xm, "y_mean": ym, "residual": residual, "target_norm": target_norm,
-            "diagnostics": diag}
+            "diagnostics": diag, "candidates": candidates}
 
 
 def apply_projection(E, proj: dict, entries: list[dict], rescale_norm: bool = False):

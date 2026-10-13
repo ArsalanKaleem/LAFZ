@@ -153,7 +153,10 @@ def cmd_inject(cfg, args):
     inject_vocab(model, len(ext))
     init_dir = cdir / "init"
     init_dir.mkdir(exist_ok=True)
-    ids, rin, rout, diag = initialize(model, _base_tok(cfg), ext, entries, cfg["cond"]["init"], cfg, init_dir)
+    n_dev = cfg["projection"].get("dev_sentences", 200)
+    dev_texts = [r["text"] for r in _eval_rows(cfg, "valid")][:n_dev]  # VALID split only; test stays untouched
+    ids, rin, rout, diag = initialize(model, _base_tok(cfg), ext, entries, cfg["cond"]["init"], cfg, init_dir,
+                                      dev_texts=dev_texts)
     save_rows(cdir / "new_rows.pt", ids, rin, rout, {"strategy": cfg["cond"]["init"], **{
         k: v for k, v in diag.items() if not isinstance(v, dict)}})
     assert roundtrip_check(cfg, cdir, model)
