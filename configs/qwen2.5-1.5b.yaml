@@ -113,3 +113,12 @@ conditions:
   D_mean_750:  { budget: 2000, init: mean,       lora: true, overrides: { lora: { steps: 750 } } }
   E:           { budget: 4000, init: projection, lora: true }
   F:           { budget: 8000, init: projection, lora: true }
+
+report:
+  pairs:                     # a = reference, b = candidate
+    - [baseline_lora, D]
+    - [baseline_lora, D_mean]
+    - [D_mean, D]
+    - [baseline_lora, D_750]
+    - [baseline_lora, D_mean_750]
+    - [D_mean_750, D_750]

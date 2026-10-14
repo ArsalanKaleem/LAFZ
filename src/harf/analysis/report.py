@@ -122,8 +122,10 @@ def significance(cfg: dict, lang_dir: Path) -> dict:
         d = pd.read_csv(comp)
         for col in [c for c in d.columns if c.startswith("tok_v")]:
             out["tokens"][col[4:]] = paired_test(d["tok_baseline"].values, d[col].values)
-    for direction_file in sorted(ev.glob("flores_baseline_*.jsonl")):
-        key = direction_file.stem.replace("flores_baseline_", "")
+    for key in _flores_directions(ev):
+        direction_file = ev / f"flores_baseline_{key}.jsonl"
+        if not direction_file.exists():
+            continue
         bh = list(read_jsonl(direction_file))
         for name in cfg["conditions"]:
             f = ev / f"flores_{name}_{key}.jsonl"
@@ -132,8 +134,68 @@ def significance(cfg: dict, lang_dir: Path) -> dict:
             ch = list(read_jsonl(f))
             out["chrf"].setdefault(key, {})[name] = paired_bootstrap_chrf(
                 [r["hyp"] for r in bh], [r["hyp"] for r in ch], [r["ref"] for r in bh])
+    out["pairs"] = pairwise_comparisons(cfg, lang_dir)
     write_json(lang_dir / "reports" / "significance.json", out)
     return out
+
+
+_DIR_RE = re.compile(r"_([a-z]{3}_[A-Za-z]{4}-[a-z]{3}_[A-Za-z]{4})$")
+
+
+def _flores_directions(ev: Path) -> list[str]:
+    """Translation directions present in eval/ (robust to condition names containing underscores)."""
+    return sorted({m.group(1) for f in ev.glob("flores_*.jsonl") if (m := _DIR_RE.search(f.stem))})
+
+
+DEFAULT_PAIRS = [["baseline_lora", "D"], ["baseline_lora", "D_mean"], ["D_mean", "D"],
+                 ["baseline_lora", "D_750"], ["baseline_lora", "D_mean_750"], ["D_mean_750", "D_750"]]
+
+
+def pairwise_comparisons(cfg: dict, lang_dir: Path) -> dict:
+    """Paired tests between specific conditions (a = reference, b = candidate; negative BPC diff = b better).
+    Writes reports/comparisons.md. Pairs come from cfg['report']['pairs'] or DEFAULT_PAIRS."""
+    ev = lang_dir / "eval"
+    pairs = (cfg.get("report") or {}).get("pairs") or DEFAULT_PAIRS
+    res: dict = {"bpc": {}, "chrf": {}}
+    lines = ["# Pairwise comparisons", "",
+             "Paired over identical test sentences. BPC: per-sentence bits/char, diff = b - a (negative = b better), "
+             "Wilcoxon p Holm-corrected across pairs. chrF++: paired bootstrap, diff = b - a.", "",
+             "## BPC", "", "| a | b | BPC a | BPC b | diff | 95% CI | p (Holm) |", "|---|---|---|---|---|---|---|"]
+    for a, b in pairs:
+        fa, fb = ev / f"ppl_per_sentence_{a}.csv", ev / f"ppl_per_sentence_{b}.csv"
+        if not (fa.exists() and fb.exists()):
+            continue
+        da, db = pd.read_csv(fa), pd.read_csv(fb)
+        assert (da["id"].values == db["id"].values).all(), f"sentence sets differ: {a} vs {b}"
+        ba = da["nll"] / (math.log(2) * da["n_chars"])
+        bb = db["nll"] / (math.log(2) * db["n_chars"])
+        t = paired_test(ba.values, bb.values)
+        t["bpc_a"] = float(da["nll"].sum() / (math.log(2) * da["n_chars"].sum()))
+        t["bpc_b"] = float(db["nll"].sum() / (math.log(2) * db["n_chars"].sum()))
+        res["bpc"][f"{a} vs {b}"] = t
+    hol = holm({k: v.get("wilcoxon_p", 1.0) for k, v in res["bpc"].items()})
+    for k, t in res["bpc"].items():
+        t["p_holm"] = hol[k]["p_holm"]
+        a, b = k.split(" vs ")
+        lines.append(f"| {a} | {b} | {t['bpc_a']:.4f} | {t['bpc_b']:.4f} | {t['mean_diff']:+.4f} | "
+                     f"[{t['ci95_mean_diff'][0]:+.4f}, {t['ci95_mean_diff'][1]:+.4f}] | {t['p_holm']:.2g} |")
+    keys = _flores_directions(ev)
+    for key in keys:
+        lines += ["", f"## chrF++ {key}", "", "| a | b | chrF a | chrF b | diff | 95% CI |", "|---|---|---|---|---|---|"]
+        for a, b in pairs:
+            fa, fb = ev / f"flores_{a}_{key}.jsonl", ev / f"flores_{b}_{key}.jsonl"
+            if not (fa.exists() and fb.exists()):
+                continue
+            ra, rb = list(read_jsonl(fa)), list(read_jsonl(fb))
+            r = paired_bootstrap_chrf([x["hyp"] for x in ra], [x["hyp"] for x in rb], [x["ref"] for x in ra])
+            res["chrf"].setdefault(key, {})[f"{a} vs {b}"] = r
+            lines.append(f"| {a} | {b} | {r['chrf_a']:.2f} | {r['chrf_b']:.2f} | {r['diff']:+.2f} | "
+                         f"[{r['ci95'][0]:+.2f}, {r['ci95'][1]:+.2f}] |")
+    out = lang_dir / "reports"
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "comparisons.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    log.info("pairwise comparisons written to %s", out / "comparisons.md")
+    return res
 
 
 # ------------------------------------------------------------------------------ failure analysis
