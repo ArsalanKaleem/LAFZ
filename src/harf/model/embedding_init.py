@@ -12,7 +12,8 @@ from pathlib import Path
 
 from ..projection.align import (apply_projection, base_merge_map, base_merge_triples, fit_ridge, nearest_neighbors,
                                 parallel_anchor, write_nn_report)
-from ..tokenizer.common import touches_arabic
+from ..text.scripts import script_for_lang
+from ..tokenizer.common import touches_script
 from ..utils import log, require_torch, write_json
 from .inject import is_tied
 
@@ -115,7 +116,8 @@ def initialize(model, base_tok, ext_tok, entries: list[dict], strategy: str, cfg
             W[idx] = rows.to(W.device, W.dtype)
         rows_out[kind] = rows.float().cpu()
         diag[f"{kind}_new_mean_pairwise_cos"] = _mean_pairwise_cos(rows)
-        ref_ids = [i for t, i in base_tok.get_vocab().items() if i < base_n and touches_arabic(t)]
+        scr = script_for_lang(cfg, cfg['lang'].split('+')[0])
+        ref_ids = [i for t, i in base_tok.get_vocab().items() if i < base_n and touches_script(t, scr)] or list(range(min(base_n, 5000)))
         diag[f"{kind}_base_arabic_mean_pairwise_cos"] = _mean_pairwise_cos(W[ref_ids].detach())
         diag[f"{kind}_new_norm_median"] = rows.float().norm(dim=1).median().item()
         diag[f"{kind}_base_norm_median"] = W[:base_n].float().norm(dim=1).median().item()

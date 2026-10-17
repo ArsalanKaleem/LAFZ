@@ -1,0 +1,5 @@
+# multilang.yaml settings on a 16 GB T4/P100 (float16).
+extends: multilang.yaml
+model: { dtype: float16 }
+lora: { autocast_dtype: float16, batch_size: 4, grad_accum: 4 }
+eval: { ppl_batch_size: 4 }

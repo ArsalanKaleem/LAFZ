@@ -15,7 +15,8 @@ import random
 from collections import Counter
 from pathlib import Path
 
-from ..text.normalize import (arabic_letter_ratio, char_inventory, looks_like_other_language, marker_counts,
+from ..text.scripts import script_for_lang
+from ..text.normalize import (script_letter_ratio, char_inventory, looks_like_other_language, marker_counts,
                               normalize, split_sentences)
 from ..utils import log, open_text, read_jsonl, stable_hash01, write_json, write_jsonl
 
@@ -51,7 +52,9 @@ def prepare_language(cfg: dict, lang: str) -> dict:
     dcfg = cfg["data"]
     seed = str(cfg["seed"])
     out_dir = Path(cfg["paths"]["processed"]) / lang
-    patterns = cfg["paths"]["raw"][lang]
+    patterns = cfg["paths"]["raw"].get(lang, [f"data/raw/{lang}/**/*"])
+    script = script_for_lang(cfg, lang)
+    min_ratio = dcfg.get("min_script_ratio", dcfg.get("min_arabic_ratio", 0.6))
     norm_counts: Counter = Counter()
     drops: Counter = Counter()
     seen_hashes = set()
@@ -65,8 +68,8 @@ def prepare_language(cfg: dict, lang: str) -> dict:
         if len(text) < dcfg["min_doc_chars"]:
             drops["too_short"] += 1
             continue
-        if arabic_letter_ratio(text) < dcfg["min_arabic_ratio"]:
-            drops["low_arabic_ratio"] += 1
+        if script_letter_ratio(text, script) < min_ratio:
+            drops["low_script_ratio"] += 1
             continue
         if dcfg.get("purity_filter") and looks_like_other_language(text, lang):
             drops["other_language_markers"] += 1

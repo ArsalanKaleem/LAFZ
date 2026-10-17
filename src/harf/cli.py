@@ -48,8 +48,23 @@ def _eval_rows(cfg, split=None):
     return load_split_multi(cfg, split or cfg["eval"]["split"])
 
 
+def _script(cfg):
+    from .text.scripts import script_for_lang
+    return script_for_lang(cfg, cfg["lang"].split("+")[0])
+
+
+def _work_tok(cfg):
+    """Tokenizer the extension is BUILT on: the base tokenizer, or its script-repaired variant."""
+    base = _base_tok(cfg)
+    if cfg["tokenizer"].get("repair_pretokenizer"):
+        from .tokenizer.repair import repair_pretokenizer
+        return repair_pretokenizer(base, _script(cfg))
+    return base
+
+
 def _manifest_path(cfg):
-    return shared_dir(cfg) / f"merges_{cfg['tokenizer']['strategy']}.json"
+    suffix = "_repaired" if cfg["tokenizer"].get("repair_pretokenizer") else ""
+    return shared_dir(cfg) / f"merges_{cfg['tokenizer']['strategy']}{suffix}.json"
 
 
 # ----------------------------------------------------------------------------- commands
@@ -82,7 +97,7 @@ def cmd_prepare(cfg, args):
 def cmd_audit(cfg, args):
     from .tokenizer.audit import run_audit
     run_audit(_base_tok(cfg), _eval_rows(cfg, "valid"), shared_dir(cfg) / "baseline_audit", "baseline",
-              cfg["seed"], freeze=True, force=args.force)
+              cfg["seed"], freeze=True, force=args.force, script=_script(cfg))
 
 
 def cmd_train_bpe(cfg, args):
@@ -91,23 +106,26 @@ def cmd_train_bpe(cfg, args):
     out = shared_dir(cfg) / "target_bpe"
     tok = train_target_bpe(_base_tok(cfg), _train_texts(cfg), cfg["tokenizer"]["target_bpe_vocab"],
                            cfg["tokenizer"]["min_pair_freq"], out)
-    run_audit(as_hf(tok), _eval_rows(cfg, "valid"), out, "target_bpe_standalone", cfg["seed"], inspect_n=30)
+    run_audit(as_hf(tok), _eval_rows(cfg, "valid"), out, "target_bpe_standalone", cfg["seed"], inspect_n=30,
+              script=_script(cfg))
 
 
 def cmd_select(cfg, args):
     from .tokenizer.select import continued_bpe, target_bpe_chains
     tc = cfg["tokenizer"]
-    base = _base_tok(cfg)
+    base = _work_tok(cfg)
     texts = _train_texts(cfg)
     if tc["strategy"] == "continued":
-        res = continued_bpe(base, texts, tc["max_budget"], tc["min_pair_freq"], tc["min_word_freq"], tc["max_unique_words"])
+        res = continued_bpe(base, texts, tc["max_budget"], tc["min_pair_freq"], tc["min_word_freq"],
+                            tc["max_unique_words"], script=_script(cfg))
     else:
         from tokenizers import Tokenizer
         p = shared_dir(cfg) / "target_bpe" / "tokenizer.json"
         if not p.exists():
             raise SystemExit("Run `harf train-bpe` first for strategy=target_bpe.")
-        res = target_bpe_chains(base, Tokenizer.from_file(str(p)), texts, tc["max_budget"])
+        res = target_bpe_chains(base, Tokenizer.from_file(str(p)), texts, tc["max_budget"], script=_script(cfg))
     res["base_model"] = cfg["model"]["name"]
+    res["repaired_pretokenizer"] = bool(tc.get("repair_pretokenizer"))
     res["base_len"] = len(base)
     write_json(_manifest_path(cfg), res)
     for b in sorted({c["budget"] for c in cfg["conditions"].values() if c.get("budget")}):
@@ -135,7 +153,8 @@ def cmd_extend(cfg, args):
                          f"but condition {cfg['condition']} asks for {budget}. Add data or lower tokenizer.min_pair_freq "
                          "(then re-run `harf select`). Not silently truncating: budgets must be what the table says.")
     texts = [r["text"] for r in _eval_rows(cfg, "valid")]
-    extend_tokenizer(_base_tok(cfg), manifest, budget, cond_dir(cfg) / "tokenizer", texts)
+    extend_tokenizer(_work_tok(cfg), manifest, budget, cond_dir(cfg) / "tokenizer", texts,
+                     reference_tok=_base_tok(cfg), script_name=_script(cfg).name)
 
 
 def cmd_inject(cfg, args):
@@ -180,6 +199,11 @@ def cmd_train_lora(cfg, args):
 def cmd_eval_compression(cfg, args):
     from .evaluation.compression import evaluate_compression, tokenizers_for_budgets
     toks = tokenizers_for_budgets(lang_dir(cfg), cfg["conditions"])
+    for name, c in cfg["conditions"].items():  # repaired variants get their own column
+        rep = (c.get("overrides") or {}).get("tokenizer", {}).get("repair_pretokenizer")
+        if rep and (lang_dir(cfg) / name / "tokenizer").exists():
+            from .tokenizer.common import load_tokenizer
+            toks[f"v{c['budget']}_repaired"] = load_tokenizer(str(lang_dir(cfg) / name / "tokenizer"))
     if not toks:
         raise SystemExit("No extended tokenizers yet. Run `harf extend --condition A` (and E, F) first.")
     evaluate_compression(_base_tok(cfg), toks, _eval_rows(cfg), lang_dir(cfg) / "eval")
@@ -240,8 +264,8 @@ def cmd_human_eval(cfg, args):
     parts = spec[5:].split(",")
     a, b = parts[0], parts[1]
     tgt = cfg["flores_codes"][cfg["lang"].split("+")[0]]
-    direction = parts[2] if len(parts) > 2 else f"eng_Latn-{tgt}"
-    n = int(parts[3]) if len(parts) > 3 else 100
+    direction = parts[2] if len(parts) > 2 and parts[2] else f"eng_Latn-{tgt}"
+    n = int(parts[3]) if len(parts) > 3 and parts[3] else 100
     print("sheet:", make_sheet(lang_dir(cfg), a, b, direction, n, cfg["seed"]))
 
 

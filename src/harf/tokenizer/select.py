@@ -29,11 +29,13 @@ from collections import Counter, defaultdict
 from typing import Iterable
 
 from ..utils import log
-from .common import backend_json, bl_to_text, touches_arabic
+from ..text.scripts import get_script
+from .common import backend_json, bl_to_text, touches_script
 
 
 # ----------------------------------------------------------------------------- word table
-def word_counts(base_tok, texts: Iterable[str], min_word_freq: int, max_unique: int) -> Counter:
+def word_counts(base_tok, texts: Iterable[str], min_word_freq: int, max_unique: int, script=None) -> Counter:
+    script = script or get_script("arabic")
     backend = base_tok.backend_tokenizer
     norm, pre = backend.normalizer, backend.pre_tokenizer
     cnt: Counter = Counter()
@@ -42,7 +44,7 @@ def word_counts(base_tok, texts: Iterable[str], min_word_freq: int, max_unique: 
             t = norm.normalize_str(t)
         for piece, _ in pre.pre_tokenize_str(t):
             cnt[piece] += 1
-    cnt = Counter({w: c for w, c in cnt.items() if c >= min_word_freq and touches_arabic(w)})
+    cnt = Counter({w: c for w, c in cnt.items() if c >= min_word_freq and touches_script(w, script)})
     if len(cnt) > max_unique:
         cnt = Counter(dict(cnt.most_common(max_unique)))
     return cnt
@@ -55,9 +57,10 @@ def base_segment(base_tok, words: Iterable[str]) -> dict[str, list[str]]:
 
 # ----------------------------------------------------------------------------- continued BPE
 def continued_bpe(base_tok, texts: Iterable[str], budget: int, min_pair_freq: int = 5,
-                  min_word_freq: int = 2, max_unique: int = 2_000_000) -> dict:
+                  min_word_freq: int = 2, max_unique: int = 2_000_000, script=None) -> dict:
+    script = script or get_script("arabic")
     base_vocab = base_tok.backend_tokenizer.get_vocab(with_added_tokens=True)
-    wc = word_counts(base_tok, texts, min_word_freq, max_unique)
+    wc = word_counts(base_tok, texts, min_word_freq, max_unique, script)
     seg = base_segment(base_tok, wc)
     words = [list(seg[w]) for w in wc]
     freqs = [wc[w] for w in wc]
@@ -85,7 +88,7 @@ def continued_bpe(base_tok, texts: Iterable[str], budget: int, min_pair_freq: in
         if c < min_pair_freq:
             break
         merged = pair[0] + pair[1]
-        if merged in base_vocab or merged in created or not touches_arabic(merged):
+        if merged in base_vocab or merged in created or not touches_script(merged, script):
             banned.add(pair)
             continue
         created.add(merged)
@@ -122,7 +125,7 @@ def continued_bpe(base_tok, texts: Iterable[str], budget: int, min_pair_freq: in
         pair_count.pop(pair, None)
 
     _annotate(new_tokens, base_vocab)
-    stats = {"strategy": "continued", "unique_words": len(wc), "base_tokens_weighted": base_total,
+    stats = {"strategy": "continued", "script": script.name, "unique_words": len(wc), "base_tokens_weighted": base_total,
              "n_new": len(new_tokens), "train_scr_at_n": {}}
     for n in (1000, 2000, 4000, 8000, len(new_tokens)):
         if 0 < n <= len(new_tokens):
@@ -131,7 +134,8 @@ def continued_bpe(base_tok, texts: Iterable[str], budget: int, min_pair_freq: in
 
 
 # ----------------------------------------------------------------------------- target BPE chains
-def target_bpe_chains(base_tok, target_tok, texts: list[str], budget: int) -> dict:
+def target_bpe_chains(base_tok, target_tok, texts: list[str], budget: int, script=None) -> dict:
+    script = script or get_script("arabic")
     """target_tok: tokenizers.Tokenizer trained by train_bpe.train_target_bpe."""
     base_vocab = base_tok.backend_tokenizer.get_vocab(with_added_tokens=True)
     model = base_tok.backend_tokenizer.model
@@ -143,7 +147,7 @@ def target_bpe_chains(base_tok, target_tok, texts: list[str], budget: int) -> di
     cands = []
     for tid, f in freq.items():
         s = id2tok[tid]
-        if s in base_vocab or not touches_arabic(s) or not bl_to_text(s).strip():
+        if s in base_vocab or not touches_script(s, script) or not bl_to_text(s).strip():
             continue
         pieces = [t.value for t in model.tokenize(s)]
         if len(pieces) < 2:

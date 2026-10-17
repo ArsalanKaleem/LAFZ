@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ..text.normalize import is_arabic_char
+from ..text.scripts import script_for_lang
 from ..utils import log, read_json, read_jsonl, write_json
 from .stats import holm, paired_bootstrap_chrf, paired_test
 
@@ -28,7 +28,8 @@ def final_table(cfg: dict, lang_dir: Path) -> pd.DataFrame:
     for name, c in cfg["conditions"].items():
         b = c.get("budget", 0)
         r = {"condition": name, "budget": b, "init": c.get("init"), "lora": c.get("lora")}
-        cs = comp["conditions"].get("baseline" if not b else f"v{b}")
+        rep = (c.get("overrides") or {}).get("tokenizer", {}).get("repair_pretokenizer")
+        cs = comp["conditions"].get("baseline" if not b else (f"v{b}_repaired" if rep else f"v{b}"))
         if cs:
             r.update({"scr": cs.get("scr", 0.0), "tokens_per_word": cs["tokens_per_word"],
                       "median_tokens_per_sentence": cs["median_tokens_per_sentence"]})
@@ -211,12 +212,12 @@ def _rep4(text: str) -> float:
     return 0.0 if not grams else 1 - len(set(grams)) / len(grams)
 
 
-def _script_mix(text: str, expect_arabic: bool) -> float:
+def _script_mix(text: str, expect_target: bool, script) -> float:
     letters = [c for c in text if c.isalpha()]
     if not letters:
         return 0.0
-    ar = sum(is_arabic_char(c) for c in letters) / len(letters)
-    return 1 - ar if expect_arabic else ar
+    share = sum(script.is_char(c) for c in letters) / len(letters)
+    return 1 - share if expect_target else share
 
 
 def failure_cases(cfg: dict, lang_dir: Path, top: int = 15) -> Path:
@@ -233,7 +234,7 @@ def failure_cases(cfg: dict, lang_dir: Path, top: int = 15) -> Path:
         to_ar = not key.endswith("eng_Latn")
         for r in rows:
             r["rep4"] = _rep4(r["hyp"])
-            r["script_mix"] = _script_mix(r["hyp"], to_ar)
+            r["script_mix"] = _script_mix(r["hyp"], to_ar, script_for_lang(cfg, cfg["lang"].split("+")[0]))
             r["len_ratio"] = len(r["hyp"]) / max(len(r["ref"]), 1)
             r["badness"] = r["rep4"] + r["script_mix"] + abs(math.log(max(r["len_ratio"], 1e-3)))
         summary.append({"condition": cond, "direction": key, "empty": sum(not r["hyp"] for r in rows),

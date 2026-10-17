@@ -7,15 +7,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ..text.normalize import is_arabic_char
+from ..text.scripts import get_script
 from ..utils import log, sha256_file, write_json
 
 
-def _is_target_word(w: str) -> bool:
-    return any(is_arabic_char(c) and c.isalpha() for c in w)
+def _is_target_word(w: str, script) -> bool:
+    return any(script.is_char(c) and c.isalpha() for c in w)
 
 
-def audit_sentences(tok, rows: list[dict]) -> pd.DataFrame:
+def audit_sentences(tok, rows: list[dict], script=None) -> pd.DataFrame:
+    script = script or get_script("arabic")
     texts = [r["text"] for r in rows]
     enc = tok(texts, add_special_tokens=False)["input_ids"]
     word_cache: dict[str, int] = {}
@@ -29,7 +30,7 @@ def audit_sentences(tok, rows: list[dict]) -> pd.DataFrame:
     for r, ids in zip(rows, enc):
         t = r["text"]
         words = t.split()
-        tw = [w for w in words if _is_target_word(w)]
+        tw = [w for w in words if _is_target_word(w, script)]
         frag = sum(word_len(w) > 1 for w in tw)
         recs.append({
             "id": r["id"], "lang": r.get("lang"), "n_chars": len(t), "n_bytes": len(t.encode("utf-8")),
@@ -72,12 +73,12 @@ def inspection_sheet(tok, rows: list[dict], n: int, seed: int) -> str:
 
 
 def run_audit(tok, rows: list[dict], out_dir: Path, name: str, seed: int, inspect_n: int = 75,
-              freeze: bool = False, force: bool = False) -> dict:
+              freeze: bool = False, force: bool = False, script=None) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     csv_path = out_dir / f"{name}_per_sentence.csv"
     if freeze and csv_path.exists() and not force:
         raise SystemExit(f"{csv_path} is frozen. Refusing to overwrite (use --force only if you really mean it).")
-    df = audit_sentences(tok, rows)
+    df = audit_sentences(tok, rows, script)
     df.to_csv(csv_path, index=False)
     summ = {"overall": summarize(df)}
     for lang, g in df.groupby("lang"):

@@ -43,13 +43,22 @@ def pretoken_ceiling(tok, sentences: list[str]) -> dict:
 
 def ceiling_table(tok, flores_dir: str, langs: list[str], split: str, out_dir: Path,
                   achieved: dict[str, dict[str, float]] | None = None) -> pd.DataFrame:
+    from ..text.scripts import script_for_flores
+    from ..tokenizer.repair import repair_pretokenizer
     rows = []
     for code in langs:
         p = Path(flores_dir) / split / f"{code}.{split}"
         if not p.exists():
             log.warning("missing %s", p)
             continue
-        r = {"lang": code, **pretoken_ceiling(tok, p.read_text(encoding="utf-8").splitlines())}
+        sents = p.read_text(encoding="utf-8").splitlines()
+        r = {"lang": code, **pretoken_ceiling(tok, sents)}
+        sc = script_for_flores(code)
+        if sc is not None and sc.marks:
+            rep = pretoken_ceiling(repair_pretokenizer(tok, sc), sents)
+            r["pretokens_per_word_repaired"] = rep["pretokens_per_word"]
+            # ceiling relative to the ORIGINAL tokenization (repair changes pre-tokens, not the baseline)
+            r["ceiling_scr_repaired"] = 1 - rep["pretokens_per_word"] / r["tokens_per_word"]
         for label, scr in (achieved or {}).get(code, {}).items():
             r[f"achieved_{label}"] = scr
             r[f"share_of_ceiling_{label}"] = scr / r["ceiling_scr"] if r["ceiling_scr"] > 0 else float("nan")
@@ -59,7 +68,8 @@ def ceiling_table(tok, flores_dir: str, langs: list[str], split: str, out_dir: P
     df.to_csv(out_dir / "pretokenizer_ceiling.csv", index=False)
     lines = ["# Pre-tokenizer ceiling", "",
              "Merges cannot cross pre-token boundaries, so `ceiling_scr` = 1 − pre-tokens/tokens is the most any "
-             "merge-based vocabulary extension can compress, however many tokens it adds.", "",
+             "merge-based vocabulary extension can compress, however many tokens it adds. `ceiling_scr_repaired` is the "
+             "same bound after the script-scoped pre-tokenizer repair.", "",
              "| " + " | ".join(df.columns) + " |", "|" + "---|" * len(df.columns)]
     for r in df.itertuples(index=False):
         lines.append("| " + " | ".join(f"{v:.3f}" if isinstance(v, float) else str(v) for v in r) + " |")

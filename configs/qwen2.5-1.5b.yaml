@@ -23,20 +23,21 @@ data:
   doc_mode: paragraph        # for .txt: "line" = one doc per line, "paragraph" = blank-line separated
   text_field: text           # for .jsonl
   min_doc_chars: 20
-  min_arabic_ratio: 0.6      # share of letters that are Arabic-script
+  min_script_ratio: 0.6      # share of letters in the language's script (see `scripts:`)
   strip_urls: true
   strip_html: true
   # Orthographic canonicalisation is LANGUAGE-SPECIFIC and OFF by default.
   # Never apply Urdu rules to Sindhi: in Sindhi, ک (U+06A9) is a different letter (kheh) from ڪ (U+06AA, kaf).
   canonicalize_letters: false
   canonicalize_heh: false    # Urdu only: ه -> ہ (risky; inspect before enabling)
-  purity_filter: true        # drop docs that look like the *other* language (Sindhi/Urdu marker letters)
+  purity_filter: true        # Urdu/Sindhi only: drop docs that look like the other one (no effect for other languages)
   valid_frac: 0.02
   test_frac: 0.02
   max_eval_sentences: 2000
   min_sentence_chars: 10
 
 tokenizer:
+  repair_pretokenizer: false # true = keep the target script's combining marks inside words (abugidas)
   strategy: continued        # continued (BPE continued over base segmentation; exact budget) | target_bpe (guide Day 4 style)
   max_budget: 8000           # learned once; 2k/4k are exact prefixes of the 8k merge list
   min_pair_freq: 5
@@ -96,7 +97,8 @@ latency:
   repeats: 5
   device: cuda
 
-flores_codes: { ur: urd_Arab, sd: snd_Arab }
+flores_codes: { ur: urd_Arab, sd: snd_Arab, ps: pbt_Arab, am: amh_Ethi, hi: hin_Deva, ta: tam_Taml }
+scripts:      { ur: arabic,   sd: arabic,   ps: arabic,   am: ethiopic, hi: devanagari, ta: tamil }
 
 # Experiment matrix (guide p.6) + controls added for causal attribution.
 conditions:

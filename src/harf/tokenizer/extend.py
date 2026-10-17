@@ -20,9 +20,25 @@ CONTROL_TEXTS = [
     "Mixed: Hello world 12345 !!! ??? ...",
     "日本語のテキスト and émojis 🙂",
 ]
+# Other scripts: each is checked unless it IS the target script (shows non-interference across scripts).
+OTHER_SCRIPT_TEXTS = {
+    "arabic": "پاکستان ایک خوبصورت ملک ہے۔",
+    "devanagari": "भारत एक विशाल देश है।",
+    "tamil": "தமிழ் மொழி மிகவும் பழமையானது.",
+    "ethiopic": "ኢትዮጵያ ትልቅ አገር ናት።",
+    "cyrillic": "Москва — столица России.",
+}
 
 
-def extend_tokenizer(base_tok, manifest: dict, n_new: int, out_dir: Path, verify_texts: list[str]) -> dict:
+def control_texts(script_name: str | None) -> list[str]:
+    return CONTROL_TEXTS + [t for k, t in OTHER_SCRIPT_TEXTS.items() if k != script_name]
+
+
+def extend_tokenizer(base_tok, manifest: dict, n_new: int, out_dir: Path, verify_texts: list[str],
+                     reference_tok=None, script_name: str | None = "arabic") -> dict:
+    """base_tok: tokenizer whose pipeline the extension is built on (possibly pre-tokenizer-repaired).
+    reference_tok: the ORIGINAL model tokenizer, used for all verification (defaults to base_tok)."""
+    reference_tok = reference_tok or base_tok
     entries = manifest["tokens"][:n_new]
     if len(entries) < n_new:
         raise SystemExit(f"Manifest has only {len(manifest['tokens'])} tokens, budget {n_new} requested.")
@@ -73,19 +89,21 @@ def extend_tokenizer(base_tok, manifest: dict, n_new: int, out_dir: Path, verify
     write_json(out_dir / "new_tokens.json", entries)
 
     ext = load_tokenizer(str(out_dir))
-    report = verify_extension(base_tok, ext, new_ids, verify_texts)
+    report = verify_extension(reference_tok, ext, new_ids, verify_texts, control_texts(script_name))
     write_json(out_dir / "verification.json", report)
     return report
 
 
-def verify_extension(base_tok, ext_tok, new_ids: list[int], texts: list[str]) -> dict:
+def verify_extension(base_tok, ext_tok, new_ids: list[int], texts: list[str], controls: list[str] | None = None) -> dict:
+    controls = controls or CONTROL_TEXTS
     rep: dict = {"len_base": len(base_tok), "len_ext": len(ext_tok), "n_new": len(new_ids)}
     # 1. existing ids unchanged
     bv, ev = base_tok.get_vocab(), ext_tok.get_vocab()
     rep["existing_ids_unchanged"] = all(ev.get(t) == i for t, i in bv.items())
     # 2. non-Arabic control text tokenized identically
     rep["control_identical"] = all(base_tok.encode(t, add_special_tokens=False) ==
-                                   ext_tok.encode(t, add_special_tokens=False) for t in CONTROL_TEXTS)
+                                   ext_tok.encode(t, add_special_tokens=False) for t in controls)
+    rep["n_control_texts"] = len(controls)
     # 3. lossless round trip on target text
     enc = ext_tok(texts, add_special_tokens=False)["input_ids"]
     bad = [t for t, ids in zip(texts, enc) if ext_tok.decode(ids) != t]

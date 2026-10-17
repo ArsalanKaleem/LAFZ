@@ -19,11 +19,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ..tokenizer.common import backend_json, touches_arabic
+from ..tokenizer.common import backend_json, touches_arabic, touches_script
 from ..utils import log, require_torch, write_json
 
 
-def base_merge_triples(base_tok, which: str = "arabic", max_pairs: int | None = None, seed: int = 0):
+def base_merge_triples(base_tok, which: str = "arabic", max_pairs: int | None = None, seed: int = 0, script=None):
     tj = backend_json(base_tok)
     vocab = tj["model"]["vocab"]
     out = []
@@ -32,6 +32,8 @@ def base_merge_triples(base_tok, which: str = "arabic", max_pairs: int | None = 
         ab = a + b
         if a in vocab and b in vocab and ab in vocab:
             if which == "arabic" and not touches_arabic(ab):
+                continue
+            if which == "script" and script is not None and not touches_script(ab, script):
                 continue
             out.append((vocab[a], vocab[b], vocab[ab]))
     if max_pairs and len(out) > max_pairs:

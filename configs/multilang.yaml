@@ -1,0 +1,14 @@
+# Multi-language study (Pashto, Amharic, Hindi, Tamil): 750-step protocol, identical for every condition
+# within a language, so baseline_lora vs H vs H_repair is a fair comparison at half the Urdu cost.
+# Usage: harf run --config configs/multilang-kaggle.yaml --lang hi --condition H
+extends: qwen2.5-1.5b.yaml
+lora: { steps: 750 }
+conditions:
+  H:          { budget: 2000, init: projection, lora: true }
+  H_repair:   { budget: 2000, init: projection, lora: true, overrides: { tokenizer: { repair_pretokenizer: true } } }
+  H_mean:     { budget: 2000, init: mean,       lora: true }
+report:
+  pairs:
+    - [baseline_lora, H]
+    - [baseline_lora, H_repair]
+    - [H, H_repair]

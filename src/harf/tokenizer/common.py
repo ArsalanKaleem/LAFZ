@@ -54,6 +54,12 @@ def touches_arabic(token: str) -> bool:
     return b is not None and any(x in ARABIC_LEAD_BYTES for x in b)
 
 
+def touches_script(token: str, script) -> bool:
+    """True iff the byte-level token contains a UTF-8 signature of `script` (see text/scripts.py)."""
+    b = bl_to_bytes(token)
+    return b is not None and script.touches(b)
+
+
 def is_byte_level(tok_json: dict) -> bool:
     s = json.dumps(tok_json.get("pre_tokenizer")) + json.dumps(tok_json.get("decoder"))
     return "ByteLevel" in s

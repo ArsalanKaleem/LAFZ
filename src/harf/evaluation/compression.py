@@ -80,6 +80,8 @@ def tokenizers_for_budgets(lang_dir: Path, conditions: dict) -> dict:
     out = {}
     for name, c in conditions.items():
         b = c.get("budget", 0)
+        if (c.get("overrides") or {}).get("tokenizer", {}).get("repair_pretokenizer"):
+            continue
         if b and f"v{b}" not in out and (lang_dir / name / "tokenizer").exists():
             out[f"v{b}"] = load_tokenizer(str(lang_dir / name / "tokenizer"))
-    return dict(sorted(out.items(), key=lambda kv: int(kv[0][1:])))
+    return dict(sorted(out.items(), key=lambda kv: int(kv[0][1:].split("_")[0])))

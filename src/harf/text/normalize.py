@@ -35,7 +35,7 @@ URDU_HEH = {"\u0647": "\u06c1"}  # ه -> ہ (opt-in, separately)
 URL_RE = re.compile(r"(https?://\S+|www\.\S+|\S+@\S+\.\S+)")
 HTML_TAG_RE = re.compile(r"<[^<>]{1,200}>")
 WS_RE = re.compile(r"[ \t\u00a0\u2000-\u200b\u3000]+")
-SENT_SPLIT_RE = re.compile(r"(?<=[۔؟!?])\s+|(?<=\.)\s+(?=\S)|\n+")
+SENT_SPLIT_RE = re.compile(r"(?<=[۔؟!?।॥።፧])\s+|(?<=\.)\s+(?=\S)|\n+")
 
 
 def is_arabic_char(ch: str) -> bool:
@@ -48,6 +48,13 @@ def arabic_letter_ratio(text: str) -> float:
     if not letters:
         return 0.0
     return sum(is_arabic_char(c) for c in letters) / len(letters)
+
+
+def script_letter_ratio(text: str, script) -> float:
+    letters = [c for c in text if unicodedata.category(c).startswith("L")]
+    if not letters:
+        return 0.0
+    return sum(script.is_char(c) for c in letters) / len(letters)
 
 
 def normalize(text: str, lang: str, *, canonicalize_letters: bool = False, canonicalize_heh: bool = False,
