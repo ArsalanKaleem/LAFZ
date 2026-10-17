@@ -12,3 +12,8 @@ wandb/
 .DS_Store
 # keep small fixtures
 !examples/data/
+
+# local backups and downloads
+kaggle_results/
+*.zip
+*.patch
