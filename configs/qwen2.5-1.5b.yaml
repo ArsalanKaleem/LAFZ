@@ -72,6 +72,7 @@ lora:
   master_dtype: float32      # float32 master weights (+ autocast below)
   autocast_dtype: bfloat16   # bfloat16 (A100/RTX30xx+) | float16 (T4/P100: Kaggle, Colab free) | none
   gradient_checkpointing: true
+  train_new_rows: true       # false = ablation: new rows frozen at init, only LoRA trains
   log_every: 10
   max_train_tokens: 20000000
 
@@ -111,6 +112,11 @@ conditions:
   # Equal-DATA controls: half the steps = same Urdu text as baseline_lora (extended tokens hold ~2x text)
   D_750:       { budget: 2000, init: projection, lora: true, overrides: { lora: { steps: 750 } } }
   D_mean_750:  { budget: 2000, init: mean,       lora: true, overrides: { lora: { steps: 750 } } }
+  # Mechanism: do the trainable new rows absorb adaptation (and protect English)?
+  D_frozen_rows: { budget: 2000, init: projection, lora: true, overrides: { lora: { train_new_rows: false } } }
+  # Seed variance (same data split; different LoRA init, data order, projection split)
+  D_seed2:       { budget: 2000, init: projection, lora: true, overrides: { seed: 14 } }
+  baseline_lora_seed2: { budget: 0, init: null, lora: true, overrides: { seed: 14 } }
   E:           { budget: 4000, init: projection, lora: true }
   F:           { budget: 8000, init: projection, lora: true }
 
@@ -122,3 +128,7 @@ report:
     - [baseline_lora, D_750]
     - [baseline_lora, D_mean_750]
     - [D_mean_750, D_750]
+    - [baseline_lora, D_seed2]
+    - [D, D_frozen_rows]
+    - [baseline_lora, E]
+    - [baseline_lora, F]

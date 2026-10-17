@@ -245,6 +245,57 @@ def cmd_human_eval(cfg, args):
     print("sheet:", make_sheet(lang_dir(cfg), a, b, direction, n, cfg["seed"]))
 
 
+def cmd_ceiling(cfg, args):
+    """Pre-tokenizer ceiling across FLORES languages (CPU). Adds achieved SCR for any extended tokenizers found."""
+    from .analysis.extra import DEFAULT_CEILING_LANGS, ceiling_table
+    from .evaluation.compression import tokenizers_for_budgets
+    from .evaluation.flores import load_flores
+    base = _base_tok(cfg)
+    langs = cfg.get("ceiling_langs") or DEFAULT_CEILING_LANGS
+    achieved = {}
+    for lang, code in cfg["flores_codes"].items():
+        ld = Path(cfg["paths"]["runs"]) / cfg["model"]["name"].split("/")[-1] / lang
+        toks = tokenizers_for_budgets(ld, cfg["conditions"]) if ld.exists() else {}
+        if toks:
+            sents = load_flores(cfg["paths"]["flores_dir"], code, "devtest")
+            nb = sum(len(base.encode(x, add_special_tokens=False)) for x in sents)
+            achieved[code] = {lab: 1 - sum(len(t.encode(x, add_special_tokens=False)) for x in sents) / nb
+                              for lab, t in toks.items()}
+    out = Path(cfg["paths"]["runs"]) / cfg["model"]["name"].split("/")[-1] / "analysis"
+    df = ceiling_table(base, cfg["paths"]["flores_dir"], langs, "devtest", out, achieved)
+    print(df.to_string(index=False))
+    print(f"\nwritten to {out / 'pretokenizer_ceiling.md'}")
+
+
+def cmd_loops(cfg, args):
+    """Looping vs fragmentation, item level (CPU; needs FLORES prediction files)."""
+    from .analysis.extra import loops_vs_fertility
+    tgt = cfg["flores_codes"][cfg["lang"].split("+")[0]]
+    conds = [c for c in cfg["conditions"]]
+    res = loops_vs_fertility(_base_tok(cfg), lang_dir(cfg) / "eval", conds, f"eng_Latn-{tgt}", lang_dir(cfg) / "reports")
+    print((lang_dir(cfg) / "reports" / f"loops_vs_fertility_eng_Latn-{tgt}.md").read_text(encoding="utf-8"))
+
+
+def cmd_lora_norms(cfg, args):
+    """Size of the LoRA update per condition (CPU; needs adapters)."""
+    from .analysis.extra import lora_update_norms
+    out = {}
+    for c in cfg["conditions"]:
+        a = lang_dir(cfg) / c / "lora" / "adapter"
+        if (a / "adapter_model.safetensors").exists():
+            out[c] = lora_update_norms(a)
+            print(f"{c:22s} total ||ΔW|| = {out[c]['total_norm']:.3f}   by type: "
+                  + ", ".join(f"{k}={v:.2f}" for k, v in out[c]["by_module_type"].items()))
+    write_json(lang_dir(cfg) / "reports" / "lora_update_norms.json", out)
+
+
+def cmd_frag_decode(cfg, args):
+    """Causal probe: constrain the model to write English with short tokens (GPU, inference only)."""
+    from .evaluation.flores import fragmented_decoding
+    model, tok = _cond_model(cfg)
+    fragmented_decoding(model, tok, cfg, lang_dir(cfg) / "eval", n=cfg.get("frag_n", 200))
+
+
 def cmd_report(cfg, args):
     from .analysis.report import failure_cases, final_table, significance
     final_table(cfg, lang_dir(cfg))
@@ -276,8 +327,9 @@ COMMANDS = {
     "eval-compression": cmd_eval_compression, "eval-ppl": cmd_eval_ppl, "eval-flores": cmd_eval_flores,
     "eval-latency": cmd_eval_latency, "report": cmd_report, "run": cmd_run,
     "eval-english": cmd_eval_english, "human-eval": cmd_human_eval,
+    "ceiling": cmd_ceiling, "loops": cmd_loops, "lora-norms": cmd_lora_norms, "frag-decode": cmd_frag_decode,
 }
-NEEDS_CONDITION = {"extend", "inject", "train-lora", "eval-ppl", "eval-flores", "eval-latency", "run", "eval-english"}
+NEEDS_CONDITION = {"extend", "inject", "train-lora", "eval-ppl", "eval-flores", "eval-latency", "run", "eval-english", "frag-decode"}
 
 
 def main(argv=None):

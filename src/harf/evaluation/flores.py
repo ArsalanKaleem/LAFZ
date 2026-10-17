@@ -39,14 +39,15 @@ def build_prompts(src: list[str], shots: list[tuple[str, str]], src_code: str, t
     return [f"{head}{sn}: {s}\n{tn}:" for s in src]
 
 
-def generate(model, tok, prompts: list[str], max_new_tokens: int, batch_size: int) -> list[str]:
+def generate(model, tok, prompts: list[str], max_new_tokens: int, batch_size: int,
+             extra_suppress: list[int] | None = None) -> list[str]:
     torch = require_torch()
     tok.padding_side = "left"
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     device = model.get_input_embeddings().weight.device
     n_rows = model.get_input_embeddings().weight.shape[0]
-    suppress = list(range(len(tok), n_rows))  # padded rows are not real tokens
+    suppress = list(range(len(tok), n_rows)) + list(extra_suppress or [])  # padded rows are not real tokens
     outs = []
     with torch.inference_mode():
         for i in range(0, len(prompts), batch_size):
@@ -88,4 +89,43 @@ def evaluate_flores(model, tok, cfg: dict, label: str, out_dir: Path, use_chat: 
                     [{"i": i, "src": s, "ref": r, "hyp": h} for i, (s, r, h) in enumerate(zip(src, ref, hyps))])
         log.info("FLORES[%s] %s chrF++=%.2f BLEU=%.2f", label, key, chrf, bleu)
     write_json(out_dir / f"flores_{label}.json", results)
+    return results
+
+
+def fragmented_decoding(model, tok, cfg: dict, out_dir, max_chars_list=(None, 3, 2, 1), n: int = 200,
+                        direction: str | None = None) -> dict:
+    """Causal probe: force the model to WRITE English with only short tokens (<= k characters), making English
+    as fragmented as Urdu/Sindhi output, and measure looping and quality. Prompts are unchanged.
+    Caveat: the model rarely saw English spelled this way in pretraining (it did see fragmented Urdu)."""
+    from ..analysis.extra import rep4
+    fc = cfg["flores"]
+    tgt = cfg["flores_codes"][cfg["lang"].split("+")[0]]
+    direction = direction or f"{tgt}-eng_Latn"
+    s_code, t_code = direction.split("-")
+    src = load_flores(cfg["paths"]["flores_dir"], s_code, fc["split"])[:n]
+    ref = load_flores(cfg["paths"]["flores_dir"], t_code, fc["split"])[:n]
+    shots = list(zip(load_flores(cfg["paths"]["flores_dir"], s_code, "dev"),
+                     load_flores(cfg["paths"]["flores_dir"], t_code, "dev")))[: fc["n_shots"]]
+    prompts = build_prompts(src, shots, s_code, t_code)
+    special = set(tok.all_special_ids)
+    lengths = {i: len(tok.decode([i]).strip("\n")) for i in range(len(tok))}
+    results = {"direction": direction, "n": len(src), "runs": {}}
+    for k in max_chars_list:
+        sup = [] if k is None else [i for i, L in lengths.items() if L > k and i not in special]
+        # more tokens are needed to write the same text with short pieces
+        mnt = fc["max_new_tokens"] * (1 if k is None else max(2, 6 // k))
+        hyps = generate(model, tok, prompts, mnt, fc["batch_size"], extra_suppress=sup)
+        r = [rep4(h) for h in hyps]
+        label = "unconstrained" if k is None else f"max{k}chars"
+        results["runs"][label] = {
+            "chrf++": corpus_chrf(hyps, ref), "mean_rep4": float(sum(r) / len(r)),
+            "loop_rate": float(sum(x >= 0.5 for x in r) / len(r)),
+            "median_len_ratio": float(sorted(len(h) / max(len(x), 1) for h, x in zip(hyps, ref))[len(ref) // 2]),
+            "tokens_per_word_output": float(sum(len(tok.encode(" " + h, add_special_tokens=False)) for h in hyps)
+                                            / max(sum(len(h.split()) for h in hyps), 1)),
+            "n_suppressed": len(sup)}
+        write_jsonl(out_dir / f"fragdecode_{label}_{direction}.jsonl",
+                    [{"i": i, "ref": x, "hyp": h} for i, (x, h) in enumerate(zip(ref, hyps))])
+        log.info("fragmented decoding %s: %s", label, results["runs"][label])
+    write_json(out_dir / f"fragdecode_{direction}.json", results)
     return results

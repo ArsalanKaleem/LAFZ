@@ -95,7 +95,9 @@ def train_lora(cfg: dict, cdir: Path) -> dict:
     lora_params = [p for n, p in model.named_parameters() if p.requires_grad]
     groups = [{"params": lora_params, "lr": lcfg["lr"], "weight_decay": 0.0}]
     delta = None
-    if new_ids:
+    if new_ids and not lcfg.get("train_new_rows", True):
+        log.info("train_new_rows=false: new rows stay at their initialisation; only LoRA is trained")
+    if new_ids and lcfg.get("train_new_rows", True):
         assert not model.get_input_embeddings().weight.requires_grad, "embedding matrix must stay frozen"
         delta = NewRowDelta(model, base_len, len(new_ids), is_tied(model))
         groups.append({"params": delta.params, "lr": lcfg["embed_lr"], "weight_decay": 0.0})
