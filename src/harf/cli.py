@@ -219,6 +219,32 @@ def cmd_eval_latency(cfg, args):
     measure_latency(model, tok, texts, cfg["condition"], lang_dir(cfg) / "eval", lc["warmup"], lc["repeats"])
 
 
+def cmd_eval_english(cfg, args):
+    """English retention: BPC on FLORES English sentences (tokenization is identical across conditions)."""
+    from .evaluation.flores import load_flores
+    from .evaluation.perplexity import evaluate_perplexity
+    sents = load_flores(cfg["paths"]["flores_dir"], "eng_Latn", "devtest")
+    rows = [{"id": f"eng-{i}", "lang": "en", "text": t} for i, t in enumerate(sents)]
+    model, tok = _cond_model(cfg)
+    evaluate_perplexity(model, tok, rows, f"english_{cfg['condition']}", lang_dir(cfg) / "eval",
+                        cfg["eval"]["ppl_batch_size"], cfg["eval"]["ppl_max_len"])
+
+
+def cmd_human_eval(cfg, args):
+    """--steps make:A,B[,direction][,n]  or  --steps score:<sheet.csv>"""
+    from .analysis.human_eval import make_sheet, score_sheet
+    spec = args.steps or "make:baseline_lora,D"
+    if spec.startswith("score:"):
+        print(json.dumps(score_sheet(Path(spec[6:])), indent=2))
+        return
+    parts = spec[5:].split(",")
+    a, b = parts[0], parts[1]
+    tgt = cfg["flores_codes"][cfg["lang"].split("+")[0]]
+    direction = parts[2] if len(parts) > 2 else f"eng_Latn-{tgt}"
+    n = int(parts[3]) if len(parts) > 3 else 100
+    print("sheet:", make_sheet(lang_dir(cfg), a, b, direction, n, cfg["seed"]))
+
+
 def cmd_report(cfg, args):
     from .analysis.report import failure_cases, final_table, significance
     final_table(cfg, lang_dir(cfg))
@@ -249,8 +275,9 @@ COMMANDS = {
     "select": cmd_select, "extend": cmd_extend, "inject": cmd_inject, "train-lora": cmd_train_lora,
     "eval-compression": cmd_eval_compression, "eval-ppl": cmd_eval_ppl, "eval-flores": cmd_eval_flores,
     "eval-latency": cmd_eval_latency, "report": cmd_report, "run": cmd_run,
+    "eval-english": cmd_eval_english, "human-eval": cmd_human_eval,
 }
-NEEDS_CONDITION = {"extend", "inject", "train-lora", "eval-ppl", "eval-flores", "eval-latency", "run"}
+NEEDS_CONDITION = {"extend", "inject", "train-lora", "eval-ppl", "eval-flores", "eval-latency", "run", "eval-english"}
 
 
 def main(argv=None):

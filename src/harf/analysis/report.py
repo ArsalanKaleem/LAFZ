@@ -42,6 +42,12 @@ def final_table(cfg: dict, lang_dir: Path) -> pd.DataFrame:
             for k, v in f.items():
                 if isinstance(v, dict) and "chrf++" in v:
                     r[f"chrf++ {k}"] = v["chrf++"]
+        en = _maybe(ev / f"ppl_english_{name}.json")
+        base_en = _maybe(ev / "ppl_english_baseline.json")
+        if en:
+            r["english_bpc"] = en["bpc"]
+            if base_en:
+                r["english_bpc_change_pct"] = 100 * (en["bpc"] / base_en["bpc"] - 1)
         l = _maybe(ev / f"latency_{name}.json")
         if l:
             r["emit_ms_median"] = l["emit_ms_median"]
