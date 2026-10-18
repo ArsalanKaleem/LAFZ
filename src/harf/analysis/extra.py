@@ -134,3 +134,44 @@ def lora_update_norms(adapter_dir: Path) -> dict:
     return {"total_norm": math.sqrt(total_sq),
             "by_module_type": {k: math.sqrt(v) for k, v in sorted(by_type.items())},
             "by_layer": {k: math.sqrt(v) for k, v in sorted(by_layer.items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else -1)}}
+
+
+# ----------------------------------------------------------------------------- 4. loops at matched length
+DEFAULT_STEP_BINS = (0, 30, 40, 50, 60, 75, 10_000)
+
+
+def loops_by_steps(rows_by_cond: dict[str, list[dict]], tok_by_cond: dict, ref_cond: str = "baseline_lora",
+                   bins=DEFAULT_STEP_BINS, min_n: int = 15, loop_threshold: float = 0.5) -> dict:
+    """Loop rate binned by the number of tokens each system's OWN tokenizer needs to write the reference
+    (= generation steps for the correct output), plus a reweighting decomposition against `ref_cond`:
+    'what would this system's loop rate be with the reference system's length distribution?'."""
+    import numpy as np
+    nb = len(bins) - 1
+    out = {"bins": list(bins), "min_n": min_n, "ref_cond": ref_cond, "table": {}, "decomposition": {}}
+    for cond, rows in rows_by_cond.items():
+        tok = tok_by_cond[cond]
+        steps = np.array([len(tok.encode(r["ref"], add_special_tokens=False)) for r in rows])
+        loop = np.array([rep4(r["hyp"]) >= loop_threshold for r in rows])
+        idx = np.clip(np.digitize(steps, bins[1:-1]), 0, nb - 1)
+        out["table"][cond] = {"n": [int((idx == k).sum()) for k in range(nb)],
+                              "rate": [float(loop[idx == k].mean()) if (idx == k).any() else None for k in range(nb)],
+                              "overall": float(loop.mean()), "mean_steps": float(steps.mean())}
+    ref = out["table"].get(ref_cond)
+    if ref:
+        for cond, t in out["table"].items():
+            if cond == ref_cond:
+                continue
+            ks = [k for k in range(nb) if t["n"][k] >= 1 and ref["n"][k] >= 1]
+            w = sum(ref["n"][k] for k in ks)
+            if not w:
+                continue
+            at_ref_len = sum(ref["n"][k] * t["rate"][k] for k in ks) / w
+            ref_rate = sum(ref["n"][k] * ref["rate"][k] for k in ks) / w
+            total = ref["overall"] - t["overall"]
+            per_step, length = ref_rate - at_ref_len, at_ref_len - t["overall"]
+            out["decomposition"][cond] = {
+                "ref_loop_rate": ref["overall"], "loop_rate": t["overall"], "at_ref_lengths": at_ref_len,
+                "reduction_total": total, "reduction_per_step": per_step, "reduction_from_length": length,
+                "share_per_step": per_step / total if total else None,
+                "coverage_of_ref": w / sum(ref["n"])}
+    return out

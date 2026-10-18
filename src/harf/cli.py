@@ -320,6 +320,14 @@ def cmd_frag_decode(cfg, args):
     fragmented_decoding(model, tok, cfg, lang_dir(cfg) / "eval", n=cfg.get("frag_n", 200))
 
 
+def cmd_document(cfg, args):
+    """Write docs/RESULTS.md with every saved number (CPU; rerun after each session)."""
+    from .analysis.results_doc import build_results_doc
+    out = build_results_doc(Path("docs/RESULTS.md"), Path(cfg["paths"]["runs"]), cfg["model"]["name"].split("/")[-1],
+                            qwen_cfg=args.config, multi_cfg=cfg.get("multilang_config", "configs/multilang.yaml"))
+    print(f"written {out}")
+
+
 def cmd_report(cfg, args):
     from .analysis.report import failure_cases, final_table, significance
     final_table(cfg, lang_dir(cfg))
@@ -351,7 +359,7 @@ COMMANDS = {
     "eval-compression": cmd_eval_compression, "eval-ppl": cmd_eval_ppl, "eval-flores": cmd_eval_flores,
     "eval-latency": cmd_eval_latency, "report": cmd_report, "run": cmd_run,
     "eval-english": cmd_eval_english, "human-eval": cmd_human_eval,
-    "ceiling": cmd_ceiling, "loops": cmd_loops, "lora-norms": cmd_lora_norms, "frag-decode": cmd_frag_decode,
+    "document": cmd_document, "ceiling": cmd_ceiling, "loops": cmd_loops, "lora-norms": cmd_lora_norms, "frag-decode": cmd_frag_decode,
 }
 NEEDS_CONDITION = {"extend", "inject", "train-lora", "eval-ppl", "eval-flores", "eval-latency", "run", "eval-english", "frag-decode"}
 
