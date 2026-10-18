@@ -88,3 +88,11 @@ def test_ceiling_table_reports_repaired_ceiling(tmp_path, toy_base_tok):
     df = ceiling_table(toy_base_tok, str(tmp_path / "flores"), ["tam_Taml", "urd_Arab"], "devtest", tmp_path / "o")
     ta = df[df.lang == "tam_Taml"].iloc[0]
     assert ta["ceiling_scr_repaired"] > ta["ceiling_scr"]
+
+
+def test_every_configured_language_has_a_flores_prompt_name():
+    from harf.config import load_config
+    from harf.evaluation.flores import LANG_NAMES
+    cfg = load_config(str(ROOT / "configs" / "multilang.yaml"))
+    missing = [c for c in cfg["flores_codes"].values() if c not in LANG_NAMES]
+    assert not missing, f"add prompt names for {missing} in evaluation/flores.py"

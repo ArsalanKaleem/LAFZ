@@ -12,7 +12,15 @@ from pathlib import Path
 from ..analysis.stats import corpus_chrf
 from ..utils import log, require_torch, write_json, write_jsonl
 
-LANG_NAMES = {"eng_Latn": "English", "urd_Arab": "Urdu", "snd_Arab": "Sindhi"}
+LANG_NAMES = {"eng_Latn": "English", "urd_Arab": "Urdu", "snd_Arab": "Sindhi", "pbt_Arab": "Pashto",
+              "amh_Ethi": "Amharic", "hin_Deva": "Hindi", "tam_Taml": "Tamil", "pes_Arab": "Persian",
+              "arb_Arab": "Arabic", "ben_Beng": "Bengali", "tel_Telu": "Telugu", "mal_Mlym": "Malayalam",
+              "sin_Sinh": "Sinhala", "tha_Thai": "Thai", "rus_Cyrl": "Russian"}
+
+
+def lang_name(code: str) -> str:
+    """Prompt name for a FLORES code; never fails (falls back to the code itself)."""
+    return LANG_NAMES.get(code, code)
 
 
 def load_flores(flores_dir: str, code: str, split: str) -> list[str]:
@@ -24,7 +32,7 @@ def load_flores(flores_dir: str, code: str, split: str) -> list[str]:
 
 def build_prompts(src: list[str], shots: list[tuple[str, str]], src_code: str, tgt_code: str,
                   tok=None, use_chat: bool = False) -> list[str]:
-    sn, tn = LANG_NAMES[src_code], LANG_NAMES[tgt_code]
+    sn, tn = lang_name(src_code), lang_name(tgt_code)
     if use_chat and tok is not None and getattr(tok, "chat_template", None):
         out = []
         for s in src:

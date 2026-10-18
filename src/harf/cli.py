@@ -277,9 +277,18 @@ def cmd_ceiling(cfg, args):
     base = _base_tok(cfg)
     langs = cfg.get("ceiling_langs") or DEFAULT_CEILING_LANGS
     achieved = {}
+    conds = dict(cfg["conditions"])
+    try:
+        conds.update(load_config(cfg.get("multilang_config", "configs/multilang.yaml"))["conditions"])
+    except FileNotFoundError:
+        pass
+    from .tokenizer.common import load_tokenizer
     for lang, code in cfg["flores_codes"].items():
         ld = Path(cfg["paths"]["runs"]) / cfg["model"]["name"].split("/")[-1] / lang
-        toks = tokenizers_for_budgets(ld, cfg["conditions"]) if ld.exists() else {}
+        toks = tokenizers_for_budgets(ld, conds) if ld.exists() else {}
+        for name, c in conds.items():
+            if (c.get("overrides") or {}).get("tokenizer", {}).get("repair_pretokenizer") and (ld / name / "tokenizer").exists():
+                toks[f"v{c['budget']}_repaired"] = load_tokenizer(str(ld / name / "tokenizer"))
         if toks:
             sents = load_flores(cfg["paths"]["flores_dir"], code, "devtest")
             nb = sum(len(base.encode(x, add_special_tokens=False)) for x in sents)
