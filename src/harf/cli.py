@@ -329,6 +329,25 @@ def cmd_frag_decode(cfg, args):
     fragmented_decoding(model, tok, cfg, lang_dir(cfg) / "eval", n=cfg.get("frag_n", 200))
 
 
+def cmd_rescore(cfg, args):
+    """FLORES chrF++ at an equal character budget for all systems (CPU, from saved predictions)."""
+    from .analysis.extra import rescore_equal_chars, write_rescore_md
+    from .tokenizer.common import load_tokenizer
+    ld = lang_dir(cfg)
+    base = _base_tok(cfg)
+    toks = {}
+    for c, spec in cfg["conditions"].items():
+        if not spec.get("budget"):
+            toks[c] = base
+        elif (ld / c / "tokenizer").exists():
+            toks[c] = load_tokenizer(str(ld / c / "tokenizer"))
+    res = rescore_equal_chars(ld / "eval", list(cfg["conditions"]), toks,
+                              max_new_tokens=cfg["flores"]["max_new_tokens"])
+    write_json(ld / "reports" / "flores_equal_chars.json", res)
+    write_rescore_md(res, ld / "reports" / "flores_equal_chars.md")
+    print((ld / "reports" / "flores_equal_chars.md").read_text(encoding="utf-8"))
+
+
 def cmd_document(cfg, args):
     """Write docs/RESULTS.md with every saved number (CPU; rerun after each session)."""
     from .analysis.results_doc import build_results_doc
@@ -368,7 +387,7 @@ COMMANDS = {
     "eval-compression": cmd_eval_compression, "eval-ppl": cmd_eval_ppl, "eval-flores": cmd_eval_flores,
     "eval-latency": cmd_eval_latency, "report": cmd_report, "run": cmd_run,
     "eval-english": cmd_eval_english, "human-eval": cmd_human_eval,
-    "document": cmd_document, "ceiling": cmd_ceiling, "loops": cmd_loops, "lora-norms": cmd_lora_norms, "frag-decode": cmd_frag_decode,
+    "document": cmd_document, "rescore": cmd_rescore, "ceiling": cmd_ceiling, "loops": cmd_loops, "lora-norms": cmd_lora_norms, "frag-decode": cmd_frag_decode,
 }
 NEEDS_CONDITION = {"extend", "inject", "train-lora", "eval-ppl", "eval-flores", "eval-latency", "run", "eval-english", "frag-decode"}
 

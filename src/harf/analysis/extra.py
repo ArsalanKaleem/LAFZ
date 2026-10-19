@@ -175,3 +175,67 @@ def loops_by_steps(rows_by_cond: dict[str, list[dict]], tok_by_cond: dict, ref_c
                 "share_per_step": per_step / total if total else None,
                 "coverage_of_ref": w / sum(ref["n"])}
     return out
+
+
+# ----------------------------------------------------------------------------- 5. equal-character rescoring
+def rescore_equal_chars(ev: Path, conditions: list[str], toks: dict, base_cond: str = "baseline",
+                        ref_cond: str = "baseline_lora", max_new_tokens: int = 256) -> dict:
+    """FLORES generation caps output at a fixed number of TOKENS, which gives extended tokenizers a larger
+    CHARACTER budget (each token holds more text). When a system fails to stop, its output is longer in text
+    and chrF++ penalises it more. Greedy decoding is left-to-right, so truncating every saved hypothesis to the
+    same character cap is equivalent to generating under that cap. Cap = longest output the base system
+    produced under its token cap. Also reports how often each system ran into the token cap (did not stop)."""
+    import re
+    import numpy as np
+    from .stats import corpus_chrf, paired_bootstrap_chrf
+    dir_re = re.compile(r"_([a-z]{3}_[A-Za-z]{4}-[a-z]{3}_[A-Za-z]{4})$")
+    dirs = sorted({m.group(1) for f in ev.glob("flores_*.jsonl") if (m := dir_re.search(f.stem))})
+    out = {}
+    for d in dirs:
+        rows = {c: list(read_jsonl(ev / f"flores_{c}_{d}.jsonl")) for c in conditions
+                if (ev / f"flores_{c}_{d}.jsonl").exists()}
+        if base_cond not in rows:
+            continue
+        refs = [r["ref"] for r in rows[base_cond]]
+        cap = max(len(r["hyp"]) for r in rows[base_cond])
+        res = {"char_cap": cap, "conditions": {}, "vs_" + ref_cond: {}}
+        capped = {}
+        for c, rs in rows.items():
+            hyps = [r["hyp"] for r in rs]
+            capped[c] = [h[:cap] for h in hyps]
+            tok = toks.get(c)
+            hit = (np.mean([len(tok.encode(h, add_special_tokens=False)) >= max_new_tokens - 2 for h in hyps])
+                   if tok is not None else float("nan"))
+            res["conditions"][c] = {
+                "chrf_original": corpus_chrf(hyps, refs), "chrf_equal_chars": corpus_chrf(capped[c], refs),
+                "hit_token_cap": float(hit), "truncated_share": float(np.mean([len(h) > cap for h in hyps])),
+                "rep4_equal_chars": float(np.mean([rep4(h) for h in capped[c]])),
+                "median_len_ratio_equal_chars": float(np.median([len(h) / max(len(x), 1) for h, x in zip(capped[c], refs)]))}
+        if ref_cond in capped:
+            for c in capped:
+                if c not in (ref_cond, base_cond):
+                    res["vs_" + ref_cond][c] = paired_bootstrap_chrf(capped[ref_cond], capped[c], refs, n=1000)
+        out[d] = res
+    return out
+
+
+def write_rescore_md(res: dict, path: Path, ref_cond: str = "baseline_lora") -> None:
+    L = ["# FLORES rescored at an equal character budget", "",
+         "Each system's outputs are truncated to the same number of characters (the longest output the base "
+         "model could produce under the 256-token cap). `hit cap` = share of outputs that ran into the token "
+         "cap, i.e. the model did not stop by itself.", ""]
+    for d, r in res.items():
+        L += [f"## {d} (character cap = {r['char_cap']})", "",
+              "| condition | chrF++ original | chrF++ equal chars | hit token cap | truncated | rep4 (equal chars) | len ratio (equal chars) |",
+              "|---|---|---|---|---|---|---|"]
+        for c, v in r["conditions"].items():
+            L.append(f"| {c} | {v['chrf_original']:.2f} | {v['chrf_equal_chars']:.2f} | {100 * v['hit_token_cap']:.0f}% | "
+                     f"{100 * v['truncated_share']:.0f}% | {v['rep4_equal_chars']:.3f} | {v['median_len_ratio_equal_chars']:.2f} |")
+        comp = r.get("vs_" + ref_cond, {})
+        if comp:
+            L += ["", f"Paired bootstrap at equal characters, vs `{ref_cond}`:", "",
+                  "| condition | chrF++ ref | chrF++ cond | diff | 95% CI |", "|---|---|---|---|---|"]
+            for c, v in comp.items():
+                L.append(f"| {c} | {v['chrf_a']:.2f} | {v['chrf_b']:.2f} | {v['diff']:+.2f} | [{v['ci95'][0]:+.2f}, {v['ci95'][1]:+.2f}] |")
+        L.append("")
+    path.write_text("\n".join(L) + "\n", encoding="utf-8")

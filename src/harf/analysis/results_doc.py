@@ -110,6 +110,11 @@ def _section_language(cfg: dict, lang: str, lang_dir: Path, base_tok) -> list[st
                      f"{_f(ad.get(f'mean_{b}'), 2)} | {_f(r.get('preference_sign_test_p'), 6)} |")
         L += ["", "Raters: record who rated each language in the paper.", ""]
 
+    rs = rep / "flores_equal_chars.md"
+    if rs.exists():
+        body = [ln for ln in rs.read_text(encoding="utf-8").split("\n") if not ln.startswith("# ")]
+        L += ["### FLORES at an equal character budget"] + [ln.replace("## ", "#### ", 1) if ln.startswith("## ") else ln for ln in body] + [_src(rs), ""]
+
     fs = rep / "failure_summary.csv"
     if fs.exists():
         L += ["### Generation failure summary (FLORES outputs)", ""] + _md_df(pd.read_csv(fs), 3) + [_src(fs), ""]
