@@ -1,6 +1,6 @@
 # HARF — all results
 
-Generated 2026-10-20 01:54 by `harf document` · git `21f7cd4998` · model `Qwen/Qwen2.5-1.5B` @ `8faed761d45a263340a0528343f099c05c9a4323`
+Generated 2026-10-20 15:19 by `harf document` · git `aaa38da334` · model `Qwen/Qwen2.5-1.5B` @ `8faed761d45a263340a0528343f099c05c9a4323`
 
 Every table lists its source file. Regenerate after each session; do not edit numbers by hand.
 
@@ -56,8 +56,10 @@ Definition: SCR = 1 - sum(tokens_ext)/sum(tokens_base); n = 2000 sentences.
 | C | 2000 | projection | False | 0.4905 | 1.5500 | 29.0000 | 3.5436 | 87249.8178 | 36.8809 |  |  |  |  |  |  |  |
 | D | 2000 | projection | True | 0.4905 | 1.5500 | 29.0000 | 1.7088 | 241.3149 | -33.9919 | 17.8634 | 34.9565 | 1.0107 | 0.9770 | 1160.0821 | 0.1167 | 1.9543 |
 | D_mean | 2000 | mean | True | 0.4905 | 1.5500 | 29.0000 | 1.7163 | 247.1551 | -33.7042 | 18.7567 | 34.8888 | 0.9979 | -0.3032 | 1163.5518 | 0.1296 | 1.9425 |
-| D_750 | 2000 | projection | True | 0.4905 | 1.5500 | 29.0000 | 1.8176 | 342.1618 | -29.7906 |  |  |  |  |  |  |  |
+| D_750 | 2000 | projection | True | 0.4905 | 1.5500 | 29.0000 | 1.8176 | 342.1618 | -29.7906 |  |  | 1.0160 | 1.5035 |  |  |  |
 | D_mean_750 | 2000 | mean | True | 0.4905 | 1.5500 | 29.0000 | 1.8278 | 353.4861 | -29.3989 |  |  |  |  |  |  |  |
+| D_frozen_rows | 2000 | projection | True | 0.4905 | 1.5500 | 29.0000 | 2.2038 | 1182.3271 | -14.8716 | 6.7968 | 23.5593 | 1.0403 | 3.9350 |  |  |  |
+| D_seed2 | 2000 | projection | True | 0.4905 | 1.5500 | 29.0000 | 1.7045 | 237.9826 | -34.1592 |  |  |  |  |  |  |  |
 
 <sub>Source: `runs/Qwen2.5-1.5B/ur/reports/final_results.csv`</sub>
 
@@ -76,6 +78,8 @@ Paired over identical test sentences. BPC: per-sentence bits/char, diff = b - a 
 | baseline_lora | D_750 | 1.8182 | 1.8176 | +0.0094 | [+0.0033, +0.0160] | 0.32 |
 | baseline_lora | D_mean_750 | 1.8182 | 1.8278 | +0.0180 | [+0.0119, +0.0243] | 2e-06 |
 | D_mean_750 | D_750 | 1.8278 | 1.8176 | -0.0086 | [-0.0119, -0.0051] | 9.5e-12 |
+| baseline_lora | D_seed2 | 1.8182 | 1.7045 | -0.1010 | [-0.1074, -0.0939] | 1.9e-175 |
+| D | D_frozen_rows | 1.7088 | 2.2038 | +0.4647 | [+0.4563, +0.4732] | 0 |
 
 ## chrF++ eng_Latn-urd_Arab
 
@@ -84,6 +88,7 @@ Paired over identical test sentences. BPC: per-sentence bits/char, diff = b - a 
 | baseline_lora | D | 13.14 | 17.86 | +4.72 | [+4.00, +5.44] |
 | baseline_lora | D_mean | 13.14 | 18.76 | +5.61 | [+4.93, +6.28] |
 | D_mean | D | 18.76 | 17.86 | -0.89 | [-1.62, -0.19] |
+| D | D_frozen_rows | 17.86 | 6.80 | -11.07 | [-11.78, -10.45] |
 
 ## chrF++ urd_Arab-eng_Latn
 
@@ -92,6 +97,7 @@ Paired over identical test sentences. BPC: per-sentence bits/char, diff = b - a 
 | baseline_lora | D | 27.84 | 34.96 | +7.12 | [+6.30, +7.91] |
 | baseline_lora | D_mean | 27.84 | 34.89 | +7.05 | [+6.16, +7.89] |
 | D_mean | D | 34.89 | 34.96 | +0.07 | [-0.67, +0.84] |
+| D | D_frozen_rows | 34.96 | 23.56 | -11.40 | [-12.18, -10.52] |
 
 <sub>Source: `runs/Qwen2.5-1.5B/ur/reports/comparisons.md`</sub>
 
@@ -140,6 +146,7 @@ Each system's outputs are truncated to the same number of characters (the longes
 | baseline_lora | 13.14 | 13.15 | 68% | 0% | 0.546 | 2.24 |
 | D | 17.86 | 19.28 | 34% | 30% | 0.298 | 1.22 |
 | D_mean | 18.76 | 19.94 | 27% | 23% | 0.247 | 1.16 |
+| D_frozen_rows | 6.80 | 7.03 | 65% | 36% | 0.701 | 3.89 |
 
 Paired bootstrap at equal characters, vs `baseline_lora`:
 
@@ -147,6 +154,7 @@ Paired bootstrap at equal characters, vs `baseline_lora`:
 |---|---|---|---|---|
 | D | 13.15 | 19.28 | +6.14 | [+5.45, +6.83] |
 | D_mean | 13.15 | 19.94 | +6.80 | [+6.15, +7.44] |
+| D_frozen_rows | 13.15 | 7.03 | -6.12 | [-6.54, -5.70] |
 
 #### urd_Arab-eng_Latn (character cap = 1452)
 
@@ -156,6 +164,7 @@ Paired bootstrap at equal characters, vs `baseline_lora`:
 | baseline_lora | 27.84 | 27.84 | 3% | 0% | 0.039 | 1.06 |
 | D | 34.96 | 34.96 | 2% | 0% | 0.026 | 1.01 |
 | D_mean | 34.89 | 34.89 | 2% | 0% | 0.025 | 0.99 |
+| D_frozen_rows | 23.56 | 23.57 | 4% | 0% | 0.067 | 1.10 |
 
 Paired bootstrap at equal characters, vs `baseline_lora`:
 
@@ -163,6 +172,7 @@ Paired bootstrap at equal characters, vs `baseline_lora`:
 |---|---|---|---|---|
 | D | 27.84 | 34.96 | +7.11 | [+6.29, +7.90] |
 | D_mean | 27.84 | 34.89 | +7.05 | [+6.17, +7.90] |
+| D_frozen_rows | 27.84 | 23.57 | -4.27 | [-5.04, -3.54] |
 
 
 <sub>Source: `runs/Qwen2.5-1.5B/ur/reports/flores_equal_chars.md`</sub>
@@ -176,6 +186,8 @@ Paired bootstrap at equal characters, vs `baseline_lora`:
 | baseline_lora | urd_Arab-eng_Latn | 0 | 0.039 | 0.000 | 1.061 |
 | baseline | urd_Arab-eng_Latn | 0 | 0.018 | 0.000 | 1.024 |
 | D | eng_Latn-urd_Arab | 0 | 0.311 | 0.019 | 1.217 |
+| D_frozen_rows | eng_Latn-urd_Arab | 0 | 0.707 | 0.048 | 4.069 |
+| D_frozen_rows | urd_Arab-eng_Latn | 0 | 0.067 | 0.000 | 1.101 |
 | D_mean | eng_Latn-urd_Arab | 0 | 0.257 | 0.024 | 1.164 |
 | D_mean | urd_Arab-eng_Latn | 0 | 0.025 | 0.000 | 0.992 |
 | D | urd_Arab-eng_Latn | 0 | 0.026 | 0.000 | 1.008 |
@@ -190,6 +202,7 @@ Paired bootstrap at equal characters, vs `baseline_lora`:
 | baseline_lora | -0.011 | 0.74 | 64.4% → 68.5% → 72.3% → 62.2% |
 | D | -0.002 | 0.96 | 32.0% → 38.2% → 32.4% → 34.9% |
 | D_mean | +0.013 | 0.68 | 26.1% → 27.2% → 29.7% → 29.3% |
+| D_frozen_rows | -0.064 | 0.041 | 77.1% → 83.1% → 81.2% → 75.5% |
 
 ### Looping at matched length (eng_Latn-urd_Arab)
 
@@ -201,6 +214,7 @@ Loop rate (n) by the number of tokens each system's own tokenizer needs to write
 | baseline_lora | – (4) | 36.0% (25) | 56.5% (69) | 58.0% (100) | 64.2% (179) | 71.5% (635) | 66.9% |
 | D | 23.8% (185) | 29.1% (251) | 35.0% (263) | 42.9% (170) | 41.0% (105) | 60.5% (38) | 34.4% |
 | D_mean | 20.0% (185) | 25.5% (251) | 27.0% (263) | 29.4% (170) | 38.1% (105) | 57.9% (38) | 28.1% |
+| D_frozen_rows | 71.9% (185) | 80.1% (251) | 78.7% (263) | 83.5% (170) | 81.9% (105) | 86.8% (38) | 79.2% |
 
 Decomposition vs `baseline_lora` (reweighting to its length distribution; approximate):
 
@@ -208,6 +222,7 @@ Decomposition vs `baseline_lora` (reweighting to its length distribution; approx
 |---|---|---|---|---|---|---|---|---|
 | D | 66.9% | 52.7% | 34.4% | 32.5% | 14.2% | 18.3% | 43.8% | 100.0% |
 | D_mean | 66.9% | 48.5% | 28.1% | 38.8% | 18.4% | 20.5% | 47.3% | 100.0% |
+| D_frozen_rows | 66.9% | 84.9% | 79.2% | -12.4% | -18.0% | 5.6% | 145.4% | 100.0% |
 
 Coverage = share of the reference system's sentences in length bins both systems occupy. Below 100%, the two parts need not sum exactly to the total.
 
@@ -220,8 +235,21 @@ Coverage = share of the reference system's sentences in length bins both systems
 | D_mean | 36.47 | 13.49 | 25.68 | 2.52 | 7.16 | 6.70 | 19.48 | 2.57 |
 | D_750 | 24.07 | 8.31 | 17.44 | 1.79 | 4.57 | 4.61 | 12.57 | 1.66 |
 | D_mean_750 | 23.76 | 7.91 | 17.22 | 1.72 | 4.61 | 4.55 | 12.56 | 1.68 |
+| D_frozen_rows | 46.13 | 16.91 | 33.43 | 3.09 | 8.92 | 8.40 | 23.60 | 2.81 |
+| D_seed2 | 37.01 | 14.08 | 25.96 | 2.57 | 7.09 | 6.85 | 19.68 | 2.55 |
 
 <sub>Source: `runs/Qwen2.5-1.5B/ur/reports/lora_update_norms.json`</sub>
+
+### Forced fragmentation of English output (urd_Arab-eng_Latn, n=200)
+
+| constraint | chrF++ | mean rep4 | loop rate | median len ratio | output tokens/word |
+|---|---|---|---|---|---|
+| unconstrained | 30.90 | 0.013 | 0.5% | 1.03 | 1.23 |
+| max3chars | 3.35 | 0.715 | 76.0% | 6.08 | 3.68 |
+| max2chars | 1.51 | 0.724 | 75.5% | 7.95 | 5.31 |
+| max1chars | 0.70 | 0.584 | 59.5% | 11.72 | 6.01 |
+
+<sub>Source: `runs/Qwen2.5-1.5B/ur/eval/fragdecode_urd_Arab-eng_Latn.json`</sub>
 
 ### Training runs
 
@@ -234,6 +262,8 @@ Per-token losses are not comparable across tokenizers.
 | D_mean | 1500 | 2.930 | 21536768 | 3.405 |  |
 | D_750 | 750 | 3.234 | 21536768 | 1.753 | 1.000 |
 | D_mean_750 | 750 | 3.247 | 21536768 | 1.758 |  |
+| D_frozen_rows | 1500 | 3.927 | 18464768 | 3.611 | 1.000 |
+| D_seed2 | 1500 | 2.722 | 21536768 | 3.649 | 1.000 |
 
 ## Sindhi (`sd`)
 
@@ -654,12 +684,121 @@ Definition: SCR = 1 - sum(tokens_ext)/sum(tokens_base); n = 2000 sentences.
 
 ### All conditions
 
-| condition | budget | init | lora | scr | tokens_per_word | median_tokens_per_sentence |
-|---|---|---|---|---|---|---|
-| baseline | 0 |  | False | 0.0000 | 6.4778 | 77.0000 |
-| H | 2000 | projection | True | 0.6168 | 2.4823 | 30.0000 |
+| condition | budget | init | lora | scr | tokens_per_word | median_tokens_per_sentence | bpc | word_ppl | bpc_change_pct | chrf++ eng_Latn-amh_Ethi | chrf++ amh_Ethi-eng_Latn | english_bpc | english_bpc_change_pct | emit_ms_median | tokenizer_ms_per_sentence | latency_speedup |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | 0 |  | False | 0.0000 | 6.4778 | 77.0000 | 4.6397 | 17502695.1580 | 0.0000 | 1.8518 | 16.0322 | 1.0010 | 0.0000 | 2679.6050 | 0.1301 | 1.0000 |
+| baseline_lora | 0 |  | True | 0.0000 | 6.4778 | 77.0000 | 3.0047 | 49057.1366 | -35.2391 | 3.4276 | 14.2002 | 1.0073 | 0.6346 | 2712.7935 | 0.1240 | 0.9897 |
+| H | 2000 | projection | True | 0.6168 | 2.4823 | 30.0000 | 2.7458 | 19338.9700 | -40.8205 | 2.6409 | 19.5874 | 1.0044 | 0.3447 | 1059.6094 | 0.1096 | 2.6082 |
 
 <sub>Source: `runs/Qwen2.5-1.5B/am/reports/final_results.csv`</sub>
+
+### Pairwise comparisons
+
+
+Paired over identical test sentences. BPC: per-sentence bits/char, diff = b - a (negative = b better), Wilcoxon p Holm-corrected across pairs. chrF++: paired bootstrap, diff = b - a.
+
+## BPC
+
+| a | b | BPC a | BPC b | diff | 95% CI | p (Holm) |
+|---|---|---|---|---|---|---|
+| baseline_lora | H | 3.0047 | 2.7458 | -0.2508 | [-0.2615, -0.2410] | 1.9e-257 |
+
+## chrF++ amh_Ethi-eng_Latn
+
+| a | b | chrF a | chrF b | diff | 95% CI |
+|---|---|---|---|---|---|
+| baseline_lora | H | 14.20 | 19.59 | +5.39 | [+4.74, +6.05] |
+
+## chrF++ eng_Latn-amh_Ethi
+
+| a | b | chrF a | chrF b | diff | 95% CI |
+|---|---|---|---|---|---|
+| baseline_lora | H | 3.43 | 2.64 | -0.79 | [-1.00, -0.58] |
+
+<sub>Source: `runs/Qwen2.5-1.5B/am/reports/comparisons.md`</sub>
+
+### FLORES at an equal character budget
+
+Each system's outputs are truncated to the same number of characters (the longest output the base model could produce under the 256-token cap). `hit cap` = share of outputs that ran into the token cap, i.e. the model did not stop by itself.
+
+#### amh_Ethi-eng_Latn (character cap = 1286)
+
+| condition | chrF++ original | chrF++ equal chars | hit token cap | truncated | rep4 (equal chars) | len ratio (equal chars) |
+|---|---|---|---|---|---|---|
+| baseline | 16.03 | 16.03 | 2% | 0% | 0.028 | 0.94 |
+| baseline_lora | 14.20 | 14.28 | 17% | 5% | 0.141 | 1.31 |
+| H | 19.59 | 19.66 | 7% | 2% | 0.078 | 1.13 |
+
+Paired bootstrap at equal characters, vs `baseline_lora`:
+
+| condition | chrF++ ref | chrF++ cond | diff | 95% CI |
+|---|---|---|---|---|
+| H | 14.28 | 19.66 | +5.37 | [+4.72, +6.04] |
+
+#### eng_Latn-amh_Ethi (character cap = 758)
+
+| condition | chrF++ original | chrF++ equal chars | hit token cap | truncated | rep4 (equal chars) | len ratio (equal chars) |
+|---|---|---|---|---|---|---|
+| baseline | 1.85 | 1.85 | 86% | 0% | 0.856 | 2.52 |
+| baseline_lora | 3.43 | 3.43 | 81% | 0% | 0.725 | 2.41 |
+| H | 2.64 | 2.66 | 69% | 4% | 0.615 | 4.62 |
+
+Paired bootstrap at equal characters, vs `baseline_lora`:
+
+| condition | chrF++ ref | chrF++ cond | diff | 95% CI |
+|---|---|---|---|---|
+| H | 3.43 | 2.66 | -0.76 | [-0.97, -0.56] |
+
+
+<sub>Source: `runs/Qwen2.5-1.5B/am/reports/flores_equal_chars.md`</sub>
+
+### Generation failure summary (FLORES outputs)
+
+| condition | direction | empty | mean_rep4 | mean_script_mix | median_len_ratio |
+|---|---|---|---|---|---|
+| baseline | amh_Ethi-eng_Latn | 0 | 0.028 | 0.000 | 0.941 |
+| baseline | eng_Latn-amh_Ethi | 0 | 0.856 | 0.007 | 2.523 |
+| baseline_lora | amh_Ethi-eng_Latn | 0 | 0.141 | 0.003 | 1.311 |
+| baseline_lora | eng_Latn-amh_Ethi | 0 | 0.725 | 0.001 | 2.414 |
+| H | amh_Ethi-eng_Latn | 0 | 0.079 | 0.000 | 1.128 |
+| H | eng_Latn-amh_Ethi | 0 | 0.616 | 0.197 | 4.628 |
+
+<sub>Source: `runs/Qwen2.5-1.5B/am/reports/failure_summary.csv`</sub>
+
+### Looping vs per-word fragmentation (eng_Latn-amh_Ethi)
+
+| condition | Spearman ρ | p | loop rate Q1 → Q4 (least → most fragmented) |
+|---|---|---|---|
+| baseline | -0.008 | 0.81 | 94.5% → 96.9% → 94.5% → 96.0% |
+| baseline_lora | -0.024 | 0.45 | 88.9% → 93.3% → 92.9% → 92.0% |
+| H | +0.046 | 0.14 | 63.6% → 67.7% → 67.1% → 69.2% |
+
+### Looping at matched length (eng_Latn-amh_Ethi)
+
+Loop rate (n) by the number of tokens each system's own tokenizer needs to write the reference.
+
+| condition | 0–30 | 30–40 | 40–50 | 50–60 | 60–75 | 75–∞ | overall |
+|---|---|---|---|---|---|---|---|
+| baseline | – (0) | – (4) | 100.0% (23) | 92.7% (41) | 95.3% (107) | 95.6% (837) | 95.5% |
+| baseline_lora | – (0) | – (4) | 87.0% (23) | 90.2% (41) | 89.7% (107) | 92.2% (837) | 91.8% |
+| H | 59.8% (189) | 69.3% (280) | 68.2% (242) | 68.5% (178) | 69.1% (94) | 62.1% (29) | 66.9% |
+
+Decomposition vs `baseline_lora` (reweighting to its length distribution; approximate):
+
+| condition | ref loop rate | at ref lengths | actual | reduction | from per-step looping | from shorter sequences | share per-step | coverage |
+|---|---|---|---|---|---|---|---|---|
+| H | 91.8% | 63.2% | 66.9% | 24.9% | 28.6% | -3.7% | 114.7% | 100.0% |
+
+Coverage = share of the reference system's sentences in length bins both systems occupy. Below 100%, the two parts need not sum exactly to the total.
+
+### Training runs
+
+Per-token losses are not comparable across tokenizers.
+
+| condition | steps | final loss (per token) | trainable params | wall time (h) | λ (dev BPC) |
+|---|---|---|---|---|---|
+| baseline_lora | 750 | 1.554 | 18464768 | 1.815 |  |
+| H | 750 | 3.608 | 21536768 | 1.837 | 1000.000 |
 
 ## Hindi (`hi`)
 
