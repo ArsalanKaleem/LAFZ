@@ -1,6 +1,6 @@
 # HARF — all results
 
-Generated 2026-10-22 18:32 by `harf document` · git `197091179c` · model `Qwen/Qwen2.5-1.5B` @ `8faed761d45a263340a0528343f099c05c9a4323`
+Generated 2026-10-22 18:41 by `harf document` · git `b977c682b8` · model `Qwen/Qwen2.5-1.5B` @ `8faed761d45a263340a0528343f099c05c9a4323`
 
 Every table lists its source file. Regenerate after each session; do not edit numbers by hand.
 
@@ -82,6 +82,7 @@ Paired over identical test sentences. BPC: per-sentence bits/char, diff = b - a 
 | D_mean_750 | D_750 | 1.8278 | 1.8176 | -0.0086 | [-0.0119, -0.0051] | 9.5e-12 |
 | baseline_lora | D_seed2 | 1.8182 | 1.7045 | -0.1010 | [-0.1074, -0.0939] | 1.9e-175 |
 | D | D_frozen_rows | 1.7088 | 2.2038 | +0.4647 | [+0.4563, +0.4732] | 0 |
+| baseline_lora | F | 1.8182 | 1.6428 | -0.1519 | [-0.1604, -0.1432] | 8.7e-195 |
 
 ## chrF++ eng_Latn-urd_Arab
 
@@ -91,6 +92,8 @@ Paired over identical test sentences. BPC: per-sentence bits/char, diff = b - a 
 | baseline_lora | D_mean | 13.14 | 18.76 | +5.61 | [+4.93, +6.28] |
 | D_mean | D | 18.76 | 17.86 | -0.89 | [-1.62, -0.19] |
 | D | D_frozen_rows | 17.86 | 6.80 | -11.07 | [-11.78, -10.45] |
+| baseline_lora | E | 13.14 | 20.98 | +7.83 | [+7.01, +8.60] |
+| baseline_lora | F | 13.14 | 22.50 | +9.36 | [+8.50, +10.23] |
 
 ## chrF++ urd_Arab-eng_Latn
 
@@ -100,6 +103,8 @@ Paired over identical test sentences. BPC: per-sentence bits/char, diff = b - a 
 | baseline_lora | D_mean | 27.84 | 34.89 | +7.05 | [+6.16, +7.89] |
 | D_mean | D | 34.89 | 34.96 | +0.07 | [-0.67, +0.84] |
 | D | D_frozen_rows | 34.96 | 23.56 | -11.40 | [-12.18, -10.52] |
+| baseline_lora | E | 27.84 | 37.88 | +10.04 | [+9.20, +10.83] |
+| baseline_lora | F | 27.84 | 39.19 | +11.35 | [+10.45, +12.20] |
 
 <sub>Source: `runs/Qwen2.5-1.5B/ur/reports/comparisons.md`</sub>
 
@@ -201,6 +206,10 @@ Paired bootstrap at equal characters, vs `baseline_lora`:
 | D_mean | eng_Latn-urd_Arab | 0 | 0.257 | 0.024 | 1.164 |
 | D_mean | urd_Arab-eng_Latn | 0 | 0.025 | 0.000 | 0.992 |
 | D | urd_Arab-eng_Latn | 0 | 0.026 | 0.000 | 1.008 |
+| E | eng_Latn-urd_Arab | 0 | 0.191 | 0.040 | 1.085 |
+| E | urd_Arab-eng_Latn | 0 | 0.014 | 0.000 | 0.972 |
+| F | eng_Latn-urd_Arab | 0 | 0.140 | 0.081 | 1.043 |
+| F | urd_Arab-eng_Latn | 0 | 0.013 | 0.000 | 0.975 |
 
 <sub>Source: `runs/Qwen2.5-1.5B/ur/reports/failure_summary.csv`</sub>
 
@@ -910,19 +919,25 @@ Paired over identical test sentences. BPC: per-sentence bits/char, diff = b - a 
 
 | a | b | BPC a | BPC b | diff | 95% CI | p (Holm) |
 |---|---|---|---|---|---|---|
-| english_baseline_lora | english_H | 0.9934 | 0.9948 | +0.0010 | [-0.0003, +0.0022] | 0.81 |
-| english_baseline_lora | english_H_repair | 0.9934 | 0.9978 | +0.0035 | [+0.0019, +0.0050] | 3.2e-05 |
-| english_H | english_H_repair | 0.9948 | 0.9978 | +0.0025 | [+0.0013, +0.0037] | 2.2e-06 |
+| baseline_lora | H | 1.8927 | 1.9032 | +0.0311 | [+0.0234, +0.0389] | 1.8e-10 |
+| baseline_lora | H_repair | 1.8927 | 1.8361 | -0.0468 | [-0.0543, -0.0394] | 2.7e-49 |
+| H | H_repair | 1.9032 | 1.8361 | -0.0779 | [-0.0848, -0.0715] | 7.4e-121 |
 
 ## chrF++ eng_Latn-hin_Deva
 
 | a | b | chrF a | chrF b | diff | 95% CI |
 |---|---|---|---|---|---|
+| baseline_lora | H | 13.58 | 12.20 | -1.38 | [-1.93, -0.86] |
+| baseline_lora | H_repair | 13.58 | 15.64 | +2.06 | [+1.36, +2.74] |
+| H | H_repair | 12.20 | 15.64 | +3.44 | [+2.82, +4.07] |
 
 ## chrF++ hin_Deva-eng_Latn
 
 | a | b | chrF a | chrF b | diff | 95% CI |
 |---|---|---|---|---|---|
+| baseline_lora | H | 32.97 | 31.72 | -1.24 | [-2.21, -0.34] |
+| baseline_lora | H_repair | 32.97 | 34.85 | +1.88 | [+1.09, +2.75] |
+| H | H_repair | 31.72 | 34.85 | +3.13 | [+2.22, +4.12] |
 
 <sub>Source: `runs/Qwen2.5-1.5B/hi/reports/comparisons_english.md`</sub>
 
@@ -1226,11 +1241,11 @@ Per-token losses are not comparable across tokenizers.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | eng_Latn | 1.261 | 1.180 | 0.209 | 0.064 | 1012 |  |  |  |  |  |  |  |  |  |  |
 | arb_Arab | 2.291 | 1.231 | 0.387 | 0.463 | 1012 | 1.171 | 0.489 |  |  |  |  |  |  |  |  |
-| hin_Deva | 4.757 | 2.535 | 0.931 | 0.467 | 1012 | 1.140 | 0.760 | 0.455 | 0.974 |  |  |  |  | 0.617 | 1.322 |
+| hin_Deva | 4.757 | 2.535 | 0.931 | 0.467 | 1012 | 1.140 | 0.760 | 0.455 | 0.974 |  |  |  |  | 0.617 | 0.812 |
 | rus_Cyrl | 2.466 | 1.229 | 0.341 | 0.502 | 1012 |  |  |  |  |  |  |  |  |  |  |
 | tha_Thai | 16.373 | 7.401 | 0.558 | 0.548 | 1012 | 1.416 | 0.913 |  |  |  |  |  |  |  |  |
 | ben_Beng | 7.116 | 3.194 | 1.076 | 0.551 | 1012 | 1.179 | 0.834 |  |  |  |  |  |  |  |  |
-| tam_Taml | 10.064 | 4.340 | 1.095 | 0.569 | 1012 | 1.231 | 0.878 | 0.562 | 0.988 |  |  |  |  | 0.732 | 1.286 |
+| tam_Taml | 10.064 | 4.340 | 1.095 | 0.569 | 1012 | 1.231 | 0.878 | 0.562 | 0.988 |  |  |  |  | 0.732 | 0.833 |
 | pes_Arab | 3.025 | 1.227 | 0.575 | 0.595 | 1012 | 1.222 | 0.596 |  |  |  |  |  |  |  |  |
 | pbt_Arab | 2.927 | 1.124 | 0.631 | 0.616 | 1012 | 1.123 | 0.616 | 0.428 | 0.695 |  |  |  |  |  |  |
 | snd_Arab | 3.099 | 1.153 | 0.657 | 0.628 | 1012 | 1.135 | 0.634 | 0.475 | 0.756 | 0.522 | 0.831 | 0.558 | 0.889 |  |  |
