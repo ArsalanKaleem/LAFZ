@@ -1,6 +1,6 @@
 # HARF — all results
 
-Generated 2026-10-20 15:19 by `harf document` · git `aaa38da334` · model `Qwen/Qwen2.5-1.5B` @ `8faed761d45a263340a0528343f099c05c9a4323`
+Generated 2026-10-22 18:32 by `harf document` · git `197091179c` · model `Qwen/Qwen2.5-1.5B` @ `8faed761d45a263340a0528343f099c05c9a4323`
 
 Every table lists its source file. Regenerate after each session; do not edit numbers by hand.
 
@@ -60,6 +60,8 @@ Definition: SCR = 1 - sum(tokens_ext)/sum(tokens_base); n = 2000 sentences.
 | D_mean_750 | 2000 | mean | True | 0.4905 | 1.5500 | 29.0000 | 1.8278 | 353.4861 | -29.3989 |  |  |  |  |  |  |  |
 | D_frozen_rows | 2000 | projection | True | 0.4905 | 1.5500 | 29.0000 | 2.2038 | 1182.3271 | -14.8716 | 6.7968 | 23.5593 | 1.0403 | 3.9350 |  |  |  |
 | D_seed2 | 2000 | projection | True | 0.4905 | 1.5500 | 29.0000 | 1.7045 | 237.9826 | -34.1592 |  |  |  |  |  |  |  |
+| E | 4000 | projection | True | 0.5373 | 1.4078 | 27.0000 | 1.6744 | 216.0555 | -35.3223 | 20.9776 | 37.8762 | 1.0109 | 0.9898 | 1002.5618 | 0.1133 | 2.2960 |
+| F | 8000 | projection | True | 0.5738 | 1.2967 | 24.5000 | 1.6428 | 195.2016 | -36.5435 | 22.5012 | 39.1917 | 1.0134 | 1.2465 | 937.7875 | 0.1131 | 2.4506 |
 
 <sub>Source: `runs/Qwen2.5-1.5B/ur/reports/final_results.csv`</sub>
 
@@ -147,6 +149,8 @@ Each system's outputs are truncated to the same number of characters (the longes
 | D | 17.86 | 19.28 | 34% | 30% | 0.298 | 1.22 |
 | D_mean | 18.76 | 19.94 | 27% | 23% | 0.247 | 1.16 |
 | D_frozen_rows | 6.80 | 7.03 | 65% | 36% | 0.701 | 3.89 |
+| E | 20.98 | 22.52 | 20% | 19% | 0.180 | 1.08 |
+| F | 22.50 | 24.15 | 14% | 14% | 0.132 | 1.04 |
 
 Paired bootstrap at equal characters, vs `baseline_lora`:
 
@@ -155,6 +159,8 @@ Paired bootstrap at equal characters, vs `baseline_lora`:
 | D | 13.15 | 19.28 | +6.14 | [+5.45, +6.83] |
 | D_mean | 13.15 | 19.94 | +6.80 | [+6.15, +7.44] |
 | D_frozen_rows | 13.15 | 7.03 | -6.12 | [-6.54, -5.70] |
+| E | 13.15 | 22.52 | +9.37 | [+8.61, +10.08] |
+| F | 13.15 | 24.15 | +11.00 | [+10.29, +11.71] |
 
 #### urd_Arab-eng_Latn (character cap = 1452)
 
@@ -165,6 +171,8 @@ Paired bootstrap at equal characters, vs `baseline_lora`:
 | D | 34.96 | 34.96 | 2% | 0% | 0.026 | 1.01 |
 | D_mean | 34.89 | 34.89 | 2% | 0% | 0.025 | 0.99 |
 | D_frozen_rows | 23.56 | 23.57 | 4% | 0% | 0.067 | 1.10 |
+| E | 37.88 | 37.88 | 1% | 0% | 0.014 | 0.97 |
+| F | 39.19 | 39.19 | 1% | 0% | 0.013 | 0.97 |
 
 Paired bootstrap at equal characters, vs `baseline_lora`:
 
@@ -173,6 +181,8 @@ Paired bootstrap at equal characters, vs `baseline_lora`:
 | D | 27.84 | 34.96 | +7.11 | [+6.29, +7.90] |
 | D_mean | 27.84 | 34.89 | +7.05 | [+6.17, +7.90] |
 | D_frozen_rows | 27.84 | 23.57 | -4.27 | [-5.04, -3.54] |
+| E | 27.84 | 37.88 | +10.03 | [+9.20, +10.83] |
+| F | 27.84 | 39.19 | +11.35 | [+10.45, +12.19] |
 
 
 <sub>Source: `runs/Qwen2.5-1.5B/ur/reports/flores_equal_chars.md`</sub>
@@ -203,6 +213,8 @@ Paired bootstrap at equal characters, vs `baseline_lora`:
 | D | -0.002 | 0.96 | 32.0% → 38.2% → 32.4% → 34.9% |
 | D_mean | +0.013 | 0.68 | 26.1% → 27.2% → 29.7% → 29.3% |
 | D_frozen_rows | -0.064 | 0.041 | 77.1% → 83.1% → 81.2% → 75.5% |
+| E | -0.041 | 0.2 | 18.6% → 21.7% → 22.7% → 20.1% |
+| F | +0.001 | 0.98 | 9.5% → 18.5% → 13.3% → 16.5% |
 
 ### Looping at matched length (eng_Latn-urd_Arab)
 
@@ -215,6 +227,8 @@ Loop rate (n) by the number of tokens each system's own tokenizer needs to write
 | D | 23.8% (185) | 29.1% (251) | 35.0% (263) | 42.9% (170) | 41.0% (105) | 60.5% (38) | 34.4% |
 | D_mean | 20.0% (185) | 25.5% (251) | 27.0% (263) | 29.4% (170) | 38.1% (105) | 57.9% (38) | 28.1% |
 | D_frozen_rows | 71.9% (185) | 80.1% (251) | 78.7% (263) | 83.5% (170) | 81.9% (105) | 86.8% (38) | 79.2% |
+| E | 11.0% (255) | 14.7% (299) | 20.6% (247) | 35.1% (134) | 53.4% (58) | 47.4% (19) | 20.8% |
+| F | 12.0% (325) | 12.7% (331) | 16.8% (214) | 17.4% (86) | 25.0% (44) | – (12) | 14.4% |
 
 Decomposition vs `baseline_lora` (reweighting to its length distribution; approximate):
 
@@ -223,6 +237,8 @@ Decomposition vs `baseline_lora` (reweighting to its length distribution; approx
 | D | 66.9% | 52.7% | 34.4% | 32.5% | 14.2% | 18.3% | 43.8% | 100.0% |
 | D_mean | 66.9% | 48.5% | 28.1% | 38.8% | 18.4% | 20.5% | 47.3% | 100.0% |
 | D_frozen_rows | 66.9% | 84.9% | 79.2% | -12.4% | -18.0% | 5.6% | 145.4% | 100.0% |
+| E | 66.9% | 44.5% | 20.8% | 46.1% | 22.4% | 23.7% | 48.6% | 100.0% |
+| F | 66.9% | 23.3% | 14.4% | 52.5% | 43.6% | 8.9% | 83.0% | 100.0% |
 
 Coverage = share of the reference system's sentences in length bins both systems occupy. Below 100%, the two parts need not sum exactly to the total.
 
@@ -237,6 +253,8 @@ Coverage = share of the reference system's sentences in length bins both systems
 | D_mean_750 | 23.76 | 7.91 | 17.22 | 1.72 | 4.61 | 4.55 | 12.56 | 1.68 |
 | D_frozen_rows | 46.13 | 16.91 | 33.43 | 3.09 | 8.92 | 8.40 | 23.60 | 2.81 |
 | D_seed2 | 37.01 | 14.08 | 25.96 | 2.57 | 7.09 | 6.85 | 19.68 | 2.55 |
+| E | 36.43 | 14.11 | 25.47 | 2.63 | 7.01 | 7.06 | 19.15 | 2.56 |
+| F | 35.83 | 13.87 | 24.96 | 2.68 | 6.88 | 7.22 | 18.85 | 2.53 |
 
 <sub>Source: `runs/Qwen2.5-1.5B/ur/reports/lora_update_norms.json`</sub>
 
@@ -264,6 +282,8 @@ Per-token losses are not comparable across tokenizers.
 | D_mean_750 | 750 | 3.247 | 21536768 | 1.758 |  |
 | D_frozen_rows | 1500 | 3.927 | 18464768 | 3.611 | 1.000 |
 | D_seed2 | 1500 | 2.722 | 21536768 | 3.649 | 1.000 |
+| E | 1500 | 3.419 | 24608768 | 4.496 | 1.000 |
+| F | 1500 | 3.369 | 30752768 | 4.511 | 1.000 |
 
 ## Sindhi (`sd`)
 
@@ -841,13 +861,163 @@ Definition: SCR = 1 - sum(tokens_ext)/sum(tokens_base); n = 2000 sentences.
 
 ### All conditions
 
-| condition | budget | init | lora | scr | tokens_per_word | median_tokens_per_sentence |
-|---|---|---|---|---|---|---|
-| baseline | 0 |  | False | 0.0000 | 4.6003 | 71.0000 |
-| H | 2000 | projection | True | 0.4438 | 2.5587 | 39.0000 |
-| H_repair | 2000 | projection | True | 0.6069 | 1.8083 | 28.0000 |
+| condition | budget | init | lora | scr | tokens_per_word | median_tokens_per_sentence | bpc | word_ppl | bpc_change_pct | chrf++ eng_Latn-hin_Deva | chrf++ hin_Deva-eng_Latn | english_bpc | english_bpc_change_pct | emit_ms_median | tokenizer_ms_per_sentence | latency_speedup |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | 0 |  | False | 0.0000 | 4.6003 | 71.0000 | 2.2080 | 2301.2316 | 0.0000 | 15.6840 | 36.6208 | 1.0010 | 0.0000 | 2266.5546 | 0.1648 | 1.0000 |
+| baseline_lora | 0 |  | True | 0.0000 | 4.6003 | 71.0000 | 1.8927 | 762.0580 | -14.2766 | 13.5773 | 32.9692 | 0.9934 | -0.7519 | 2252.8615 | 0.1565 | 1.0143 |
+| H | 2000 | projection | True | 0.4438 | 2.5587 | 39.0000 | 1.9032 | 790.4885 | -13.8034 | 12.1985 | 31.7249 | 0.9948 | -0.6180 | 1144.8966 | 0.1557 | 1.8496 |
+| H_repair | 2000 | projection | True | 0.6069 | 1.8083 | 28.0000 | 1.8361 | 624.8251 | -16.8414 | 15.6392 | 34.8535 | 0.9978 | -0.3197 | 895.3874 | 0.1164 | 2.5637 |
 
 <sub>Source: `runs/Qwen2.5-1.5B/hi/reports/final_results.csv`</sub>
+
+### Pairwise comparisons
+
+
+Paired over identical test sentences. BPC: per-sentence bits/char, diff = b - a (negative = b better), Wilcoxon p Holm-corrected across pairs. chrF++: paired bootstrap, diff = b - a.
+
+## BPC
+
+| a | b | BPC a | BPC b | diff | 95% CI | p (Holm) |
+|---|---|---|---|---|---|---|
+| baseline_lora | H | 1.8927 | 1.9032 | +0.0311 | [+0.0234, +0.0389] | 1.8e-10 |
+| baseline_lora | H_repair | 1.8927 | 1.8361 | -0.0468 | [-0.0543, -0.0394] | 2.7e-49 |
+| H | H_repair | 1.9032 | 1.8361 | -0.0779 | [-0.0848, -0.0715] | 7.4e-121 |
+
+## chrF++ eng_Latn-hin_Deva
+
+| a | b | chrF a | chrF b | diff | 95% CI |
+|---|---|---|---|---|---|
+| baseline_lora | H | 13.58 | 12.20 | -1.38 | [-1.93, -0.86] |
+| baseline_lora | H_repair | 13.58 | 15.64 | +2.06 | [+1.36, +2.74] |
+| H | H_repair | 12.20 | 15.64 | +3.44 | [+2.82, +4.07] |
+
+## chrF++ hin_Deva-eng_Latn
+
+| a | b | chrF a | chrF b | diff | 95% CI |
+|---|---|---|---|---|---|
+| baseline_lora | H | 32.97 | 31.72 | -1.24 | [-2.21, -0.34] |
+| baseline_lora | H_repair | 32.97 | 34.85 | +1.88 | [+1.09, +2.75] |
+| H | H_repair | 31.72 | 34.85 | +3.13 | [+2.22, +4.12] |
+
+<sub>Source: `runs/Qwen2.5-1.5B/hi/reports/comparisons.md`</sub>
+
+### English retention: paired tests
+
+
+Paired over identical test sentences. BPC: per-sentence bits/char, diff = b - a (negative = b better), Wilcoxon p Holm-corrected across pairs. chrF++: paired bootstrap, diff = b - a.
+
+## BPC
+
+| a | b | BPC a | BPC b | diff | 95% CI | p (Holm) |
+|---|---|---|---|---|---|---|
+| english_baseline_lora | english_H | 0.9934 | 0.9948 | +0.0010 | [-0.0003, +0.0022] | 0.81 |
+| english_baseline_lora | english_H_repair | 0.9934 | 0.9978 | +0.0035 | [+0.0019, +0.0050] | 3.2e-05 |
+| english_H | english_H_repair | 0.9948 | 0.9978 | +0.0025 | [+0.0013, +0.0037] | 2.2e-06 |
+
+## chrF++ eng_Latn-hin_Deva
+
+| a | b | chrF a | chrF b | diff | 95% CI |
+|---|---|---|---|---|---|
+
+## chrF++ hin_Deva-eng_Latn
+
+| a | b | chrF a | chrF b | diff | 95% CI |
+|---|---|---|---|---|---|
+
+<sub>Source: `runs/Qwen2.5-1.5B/hi/reports/comparisons_english.md`</sub>
+
+### FLORES at an equal character budget
+
+Each system's outputs are truncated to the same number of characters (the longest output the base model could produce under the 256-token cap). `hit cap` = share of outputs that ran into the token cap, i.e. the model did not stop by itself.
+
+#### eng_Latn-hin_Deva (character cap = 311)
+
+| condition | chrF++ original | chrF++ equal chars | hit token cap | truncated | rep4 (equal chars) | len ratio (equal chars) |
+|---|---|---|---|---|---|---|
+| baseline | 15.68 | 15.68 | 54% | 0% | 0.382 | 1.47 |
+| baseline_lora | 13.58 | 13.58 | 66% | 0% | 0.484 | 1.71 |
+| H | 12.20 | 14.24 | 79% | 82% | 0.570 | 2.29 |
+| H_repair | 15.64 | 19.15 | 38% | 41% | 0.303 | 1.26 |
+
+Paired bootstrap at equal characters, vs `baseline_lora`:
+
+| condition | chrF++ ref | chrF++ cond | diff | 95% CI |
+|---|---|---|---|---|
+| H | 13.58 | 14.24 | +0.67 | [+0.09, +1.20] |
+| H_repair | 13.58 | 19.15 | +5.57 | [+4.94, +6.20] |
+
+#### hin_Deva-eng_Latn (character cap = 1419)
+
+| condition | chrF++ original | chrF++ equal chars | hit token cap | truncated | rep4 (equal chars) | len ratio (equal chars) |
+|---|---|---|---|---|---|---|
+| baseline | 36.62 | 36.62 | 2% | 0% | 0.018 | 0.98 |
+| baseline_lora | 32.97 | 32.97 | 2% | 0% | 0.031 | 1.04 |
+| H | 31.72 | 31.74 | 3% | 0% | 0.034 | 1.03 |
+| H_repair | 34.85 | 34.85 | 1% | 0% | 0.018 | 1.02 |
+
+Paired bootstrap at equal characters, vs `baseline_lora`:
+
+| condition | chrF++ ref | chrF++ cond | diff | 95% CI |
+|---|---|---|---|---|
+| H | 32.97 | 31.74 | -1.23 | [-2.18, -0.32] |
+| H_repair | 32.97 | 34.85 | +1.88 | [+1.09, +2.75] |
+
+
+<sub>Source: `runs/Qwen2.5-1.5B/hi/reports/flores_equal_chars.md`</sub>
+
+### Generation failure summary (FLORES outputs)
+
+| condition | direction | empty | mean_rep4 | mean_script_mix | median_len_ratio |
+|---|---|---|---|---|---|
+| baseline | eng_Latn-hin_Deva | 0 | 0.382 | 0.004 | 1.469 |
+| baseline | hin_Deva-eng_Latn | 0 | 0.018 | 0.000 | 0.981 |
+| baseline_lora | eng_Latn-hin_Deva | 0 | 0.484 | 0.003 | 1.712 |
+| baseline_lora | hin_Deva-eng_Latn | 0 | 0.031 | 0.000 | 1.038 |
+| H | eng_Latn-hin_Deva | 0 | 0.662 | 0.029 | 3.469 |
+| H | hin_Deva-eng_Latn | 0 | 0.034 | 0.000 | 1.034 |
+| H_repair | eng_Latn-hin_Deva | 0 | 0.370 | 0.042 | 1.290 |
+| H_repair | hin_Deva-eng_Latn | 0 | 0.018 | 0.000 | 1.021 |
+
+<sub>Source: `runs/Qwen2.5-1.5B/hi/reports/failure_summary.csv`</sub>
+
+### Looping vs per-word fragmentation (eng_Latn-hin_Deva)
+
+| condition | Spearman ρ | p | loop rate Q1 → Q4 (least → most fragmented) |
+|---|---|---|---|
+| baseline | -0.016 | 0.62 | 43.5% → 49.0% → 45.7% → 43.3% |
+| baseline_lora | +0.021 | 0.5 | 50.6% → 57.7% → 63.8% → 55.6% |
+| H | -0.032 | 0.31 | 79.4% → 83.4% → 78.3% → 82.5% |
+| H_repair | +0.007 | 0.83 | 37.5% → 41.1% → 44.9% → 39.7% |
+
+### Looping at matched length (eng_Latn-hin_Deva)
+
+Loop rate (n) by the number of tokens each system's own tokenizer needs to write the reference.
+
+| condition | 0–30 | 30–40 | 40–50 | 50–60 | 60–75 | 75–∞ | overall |
+|---|---|---|---|---|---|---|---|
+| baseline | – (0) | – (2) | 46.7% (15) | 38.1% (21) | 36.7% (98) | 46.5% (876) | 45.4% |
+| baseline_lora | – (0) | – (2) | 66.7% (15) | 28.6% (21) | 54.1% (98) | 57.8% (876) | 56.9% |
+| H | 77.3% (22) | 77.8% (99) | 79.2% (144) | 80.8% (167) | 78.9% (261) | 84.6% (319) | 80.9% |
+| H_repair | 36.1% (147) | 32.6% (233) | 40.2% (254) | 41.1% (190) | 49.6% (141) | 72.3% (47) | 40.8% |
+
+Decomposition vs `baseline_lora` (reweighting to its length distribution; approximate):
+
+| condition | ref loop rate | at ref lengths | actual | reduction | from per-step looping | from shorter sequences | share per-step | coverage |
+|---|---|---|---|---|---|---|---|---|
+| H | 56.9% | 83.9% | 80.9% | -24.0% | -27.0% | 3.0% | 112.4% | 100.0% |
+| H_repair | 56.9% | 68.9% | 40.8% | 16.1% | -12.0% | 28.1% | -74.6% | 100.0% |
+
+Coverage = share of the reference system's sentences in length bins both systems occupy. Below 100%, the two parts need not sum exactly to the total.
+
+### Training runs
+
+Per-token losses are not comparable across tokenizers.
+
+| condition | steps | final loss (per token) | trainable params | wall time (h) | λ (dev BPC) |
+|---|---|---|---|---|---|
+| baseline_lora | 750 | 1.193 | 18464768 | 2.072 |  |
+| H | 750 | 2.213 | 21536768 | 2.096 | 0.100 |
+| H_repair | 750 | 3.237 | 21536768 | 2.091 | 1.000 |
 
 ## Tamil (`ta`)
 
@@ -1052,23 +1222,23 @@ Per-token losses are not comparable across tokenizers.
 
 `ceiling_scr` = 1 − pre-tokens/tokens: the most any merge-based extension can compress under the inherited pre-tokenizer; `ceiling_scr_repaired` = the same after the script-scoped repair.
 
-| lang | tokens_per_word | pretokens_per_word | tokens_per_char | ceiling_scr | n_sentences | pretokens_per_word_repaired | ceiling_scr_repaired | achieved_v2000 | share_of_ceiling_v2000 | achieved_v4000 | share_of_ceiling_v4000 | achieved_v8000 | share_of_ceiling_v8000 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| eng_Latn | 1.261 | 1.180 | 0.209 | 0.064 | 1012 |  |  |  |  |  |  |  |  |
-| arb_Arab | 2.291 | 1.231 | 0.387 | 0.463 | 1012 | 1.171 | 0.489 |  |  |  |  |  |  |
-| hin_Deva | 4.757 | 2.535 | 0.931 | 0.467 | 1012 | 1.140 | 0.760 |  |  |  |  |  |  |
-| rus_Cyrl | 2.466 | 1.229 | 0.341 | 0.502 | 1012 |  |  |  |  |  |  |  |  |
-| tha_Thai | 16.373 | 7.401 | 0.558 | 0.548 | 1012 | 1.416 | 0.913 |  |  |  |  |  |  |
-| ben_Beng | 7.116 | 3.194 | 1.076 | 0.551 | 1012 | 1.179 | 0.834 |  |  |  |  |  |  |
-| tam_Taml | 10.064 | 4.340 | 1.095 | 0.569 | 1012 | 1.231 | 0.878 |  |  |  |  |  |  |
-| pes_Arab | 3.025 | 1.227 | 0.575 | 0.595 | 1012 | 1.222 | 0.596 |  |  |  |  |  |  |
-| pbt_Arab | 2.927 | 1.124 | 0.631 | 0.616 | 1012 | 1.123 | 0.616 |  |  |  |  |  |  |
-| snd_Arab | 3.099 | 1.153 | 0.657 | 0.628 | 1012 | 1.135 | 0.634 | 0.475 | 0.756 | 0.522 | 0.831 | 0.558 | 0.889 |
-| urd_Arab | 3.145 | 1.128 | 0.669 | 0.641 | 1012 | 1.117 | 0.645 | 0.493 | 0.768 | 0.542 | 0.844 | 0.577 | 0.900 |
-| tel_Telu | 11.406 | 3.936 | 1.458 | 0.655 | 1012 | 1.264 | 0.889 |  |  |  |  |  |  |
-| mal_Mlym | 13.368 | 4.603 | 1.336 | 0.656 | 1012 | 1.278 | 0.904 |  |  |  |  |  |  |
-| sin_Sinh | 9.173 | 2.959 | 1.449 | 0.677 | 1012 | 1.235 | 0.865 |  |  |  |  |  |  |
-| amh_Ethi | 6.448 | 1.184 | 1.282 | 0.816 | 1012 | 1.184 | 0.816 |  |  |  |  |  |  |
+| lang | tokens_per_word | pretokens_per_word | tokens_per_char | ceiling_scr | n_sentences | pretokens_per_word_repaired | ceiling_scr_repaired | achieved_v2000 | share_of_ceiling_v2000 | achieved_v4000 | share_of_ceiling_v4000 | achieved_v8000 | share_of_ceiling_v8000 | achieved_v2000_repaired | share_of_ceiling_v2000_repaired |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| eng_Latn | 1.261 | 1.180 | 0.209 | 0.064 | 1012 |  |  |  |  |  |  |  |  |  |  |
+| arb_Arab | 2.291 | 1.231 | 0.387 | 0.463 | 1012 | 1.171 | 0.489 |  |  |  |  |  |  |  |  |
+| hin_Deva | 4.757 | 2.535 | 0.931 | 0.467 | 1012 | 1.140 | 0.760 | 0.455 | 0.974 |  |  |  |  | 0.617 | 1.322 |
+| rus_Cyrl | 2.466 | 1.229 | 0.341 | 0.502 | 1012 |  |  |  |  |  |  |  |  |  |  |
+| tha_Thai | 16.373 | 7.401 | 0.558 | 0.548 | 1012 | 1.416 | 0.913 |  |  |  |  |  |  |  |  |
+| ben_Beng | 7.116 | 3.194 | 1.076 | 0.551 | 1012 | 1.179 | 0.834 |  |  |  |  |  |  |  |  |
+| tam_Taml | 10.064 | 4.340 | 1.095 | 0.569 | 1012 | 1.231 | 0.878 | 0.562 | 0.988 |  |  |  |  | 0.732 | 1.286 |
+| pes_Arab | 3.025 | 1.227 | 0.575 | 0.595 | 1012 | 1.222 | 0.596 |  |  |  |  |  |  |  |  |
+| pbt_Arab | 2.927 | 1.124 | 0.631 | 0.616 | 1012 | 1.123 | 0.616 | 0.428 | 0.695 |  |  |  |  |  |  |
+| snd_Arab | 3.099 | 1.153 | 0.657 | 0.628 | 1012 | 1.135 | 0.634 | 0.475 | 0.756 | 0.522 | 0.831 | 0.558 | 0.889 |  |  |
+| urd_Arab | 3.145 | 1.128 | 0.669 | 0.641 | 1012 | 1.117 | 0.645 | 0.493 | 0.768 | 0.542 | 0.844 | 0.577 | 0.900 |  |  |
+| tel_Telu | 11.406 | 3.936 | 1.458 | 0.655 | 1012 | 1.264 | 0.889 |  |  |  |  |  |  |  |  |
+| mal_Mlym | 13.368 | 4.603 | 1.336 | 0.656 | 1012 | 1.278 | 0.904 |  |  |  |  |  |  |  |  |
+| sin_Sinh | 9.173 | 2.959 | 1.449 | 0.677 | 1012 | 1.235 | 0.865 |  |  |  |  |  |  |  |  |
+| amh_Ethi | 6.448 | 1.184 | 1.282 | 0.816 | 1012 | 1.184 | 0.816 | 0.611 | 0.749 |  |  |  |  |  |  |
 
 <sub>Source: `runs/Qwen2.5-1.5B/analysis/pretokenizer_ceiling.csv`</sub>
 
