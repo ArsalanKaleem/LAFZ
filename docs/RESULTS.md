@@ -1,6 +1,6 @@
 # HARF — all results
 
-Generated 2026-10-22 18:41 by `harf document` · git `b977c682b8` · model `Qwen/Qwen2.5-1.5B` @ `8faed761d45a263340a0528343f099c05c9a4323`
+Generated 2026-10-22 18:52 by `harf document` · git `2ba56c1556` · model `Qwen/Qwen2.5-1.5B` @ `8faed761d45a263340a0528343f099c05c9a4323`
 
 Every table lists its source file. Regenerate after each session; do not edit numbers by hand.
 
@@ -82,7 +82,8 @@ Paired over identical test sentences. BPC: per-sentence bits/char, diff = b - a 
 | D_mean_750 | D_750 | 1.8278 | 1.8176 | -0.0086 | [-0.0119, -0.0051] | 9.5e-12 |
 | baseline_lora | D_seed2 | 1.8182 | 1.7045 | -0.1010 | [-0.1074, -0.0939] | 1.9e-175 |
 | D | D_frozen_rows | 1.7088 | 2.2038 | +0.4647 | [+0.4563, +0.4732] | 0 |
-| baseline_lora | F | 1.8182 | 1.6428 | -0.1519 | [-0.1604, -0.1432] | 8.7e-195 |
+| baseline_lora | E | 1.8182 | 1.6744 | -0.1227 | [-0.1303, -0.1150] | 3.6e-180 |
+| baseline_lora | F | 1.8182 | 1.6428 | -0.1519 | [-0.1604, -0.1432] | 9.8e-195 |
 
 ## chrF++ eng_Latn-urd_Arab
 
