@@ -61,7 +61,8 @@ def ceiling_table(tok, flores_dir: str, langs: list[str], split: str, out_dir: P
             r["ceiling_scr_repaired"] = 1 - rep["pretokens_per_word"] / r["tokens_per_word"]
         for label, scr in (achieved or {}).get(code, {}).items():
             r[f"achieved_{label}"] = scr
-            r[f"share_of_ceiling_{label}"] = scr / r["ceiling_scr"] if r["ceiling_scr"] > 0 else float("nan")
+            ceil = r.get("ceiling_scr_repaired") if label.endswith("_repaired") else r["ceiling_scr"]
+            r[f"share_of_ceiling_{label}"] = scr / ceil if ceil and ceil > 0 else float("nan")
         rows.append(r)
     df = pd.DataFrame(rows).sort_values("ceiling_scr")
     out_dir.mkdir(parents=True, exist_ok=True)

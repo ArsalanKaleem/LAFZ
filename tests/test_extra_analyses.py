@@ -30,3 +30,13 @@ def test_loops_vs_fertility(tmp_path, toy_base_tok, ur_sents):
     res = loops_vs_fertility(toy_base_tok, ev, ["baseline", "D"], "eng_Latn-urd_Arab", tmp_path / "rep")
     assert res["conditions"]["baseline"]["loop_rate"] > res["conditions"]["D"]["loop_rate"] == 0
     assert (tmp_path / "rep" / "loops_vs_fertility_eng_Latn-urd_Arab.md").exists()
+
+
+def test_align_handles_mismatched_sentence_sets():
+    import pandas as pd
+    from harf.analysis.report import _align
+    a = pd.DataFrame({"id": ["s1", "s2", "s3", "s4"], "nll": [1.0, 2, 3, 4], "n_chars": [10, 10, 10, 10], "n_tokens": [5, 5, 5, 5]})
+    b = a.iloc[[3, 0, 1]].copy()                       # reordered + one sentence missing
+    m = _align(a, b, "a", "b", min_overlap=0.7)
+    assert list(m["id"]) == ["s1", "s2", "s4"] and (m["nll_a"] == m["nll_b"]).all()
+    assert _align(a, b.iloc[:1], "a", "b") is None      # too little overlap -> skipped, no crash

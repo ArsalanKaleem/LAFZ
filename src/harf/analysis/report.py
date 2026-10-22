@@ -99,6 +99,21 @@ def _plots(df: pd.DataFrame, out: Path) -> None:
     plt.close(fig)
 
 
+def _align(da: pd.DataFrame, db: pd.DataFrame, a: str, b: str, min_overlap: float = 0.9):
+    """Pair two per-sentence tables by sentence id. Warns when the sets differ; returns None if they overlap
+    too little to compare (e.g. a file produced from a different test split)."""
+    m = da.merge(db, on="id", suffixes=("_a", "_b"))
+    n = min(len(da), len(db))
+    if len(da) != len(db) or len(m) != n:
+        log.warning("%s vs %s: %d vs %d sentences, %d shared ids — comparing the shared ones",
+                    a, b, len(da), len(db), len(m))
+    if len(m) < min_overlap * max(len(da), len(db)):
+        log.error("%s vs %s: only %d shared sentences; SKIPPED (check that both came from the same test split)",
+                  a, b, len(m))
+        return None
+    return m
+
+
 def significance(cfg: dict, lang_dir: Path) -> dict:
     """Paired tests vs baseline (per-sentence BPC; per-sentence tokens; chrF++ bootstrap) + Holm, and
     short/long breakdown (split at the median baseline token count)."""
@@ -112,17 +127,19 @@ def significance(cfg: dict, lang_dir: Path) -> dict:
             p = ev / f"ppl_per_sentence_{name}.csv"
             if name == "baseline" or not p.exists():
                 continue
-            c = pd.read_csv(p)
-            assert (c["id"].values == b["id"].values).all(), "sentence sets differ!"
-            c_bpc = c["nll"] / (math.log(2) * c["n_chars"])
-            out["bpc"][name] = paired_test(b_bpc.values, c_bpc.values)
-            long = b["n_tokens"] > b["n_tokens"].median()
-            out["by_length"][name] = {"short": paired_test(b_bpc[~long].values, c_bpc[~long].values),
-                                      "long": paired_test(b_bpc[long].values, c_bpc[long].values)}
-            if "lang" in b and b["lang"].nunique() > 1:
+            m = _align(b, pd.read_csv(p), "baseline", name)
+            if m is None:
+                continue
+            mb = m["nll_a"] / (math.log(2) * m["n_chars_a"])
+            mc = m["nll_b"] / (math.log(2) * m["n_chars_b"])
+            out["bpc"][name] = paired_test(mb.values, mc.values)
+            long = m["n_tokens_a"] > m["n_tokens_a"].median()
+            out["by_length"][name] = {"short": paired_test(mb[~long].values, mc[~long].values),
+                                      "long": paired_test(mb[long].values, mc[long].values)}
+            if "lang_a" in m and m["lang_a"].nunique() > 1:
                 out["by_length"][name]["by_lang"] = {
-                    str(l): paired_test(b_bpc[b["lang"] == l].values, c_bpc[b["lang"] == l].values)
-                    for l in b["lang"].unique()}
+                    str(l): paired_test(mb[m["lang_a"] == l].values, mc[m["lang_a"] == l].values)
+                    for l in m["lang_a"].unique()}
         out["bpc_holm"] = holm({k: v.get("wilcoxon_p", 1.0) for k, v in out["bpc"].items()})
     comp = ev / "compression_per_sentence.csv"
     if comp.exists():
@@ -172,13 +189,15 @@ def pairwise_comparisons(cfg: dict, lang_dir: Path) -> dict:
         fa, fb = ev / f"ppl_per_sentence_{a}.csv", ev / f"ppl_per_sentence_{b}.csv"
         if not (fa.exists() and fb.exists()):
             continue
-        da, db = pd.read_csv(fa), pd.read_csv(fb)
-        assert (da["id"].values == db["id"].values).all(), f"sentence sets differ: {a} vs {b}"
-        ba = da["nll"] / (math.log(2) * da["n_chars"])
-        bb = db["nll"] / (math.log(2) * db["n_chars"])
+        m = _align(pd.read_csv(fa), pd.read_csv(fb), a, b)
+        if m is None:
+            continue
+        ba = m["nll_a"] / (math.log(2) * m["n_chars_a"])
+        bb = m["nll_b"] / (math.log(2) * m["n_chars_b"])
         t = paired_test(ba.values, bb.values)
-        t["bpc_a"] = float(da["nll"].sum() / (math.log(2) * da["n_chars"].sum()))
-        t["bpc_b"] = float(db["nll"].sum() / (math.log(2) * db["n_chars"].sum()))
+        t["n"] = int(len(m))
+        t["bpc_a"] = float(m["nll_a"].sum() / (math.log(2) * m["n_chars_a"].sum()))
+        t["bpc_b"] = float(m["nll_b"].sum() / (math.log(2) * m["n_chars_b"].sum()))
         res["bpc"][f"{a} vs {b}"] = t
     hol = holm({k: v.get("wilcoxon_p", 1.0) for k, v in res["bpc"].items()})
     for k, t in res["bpc"].items():
